@@ -1,59 +1,69 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ustoz_yordamchi_secret_2024';
 
-// ✅ TUZATILDI: service:'gmail' o'rniga host/port aniq ko'rsatildi
-// Railway.app da smtp.gmail.com port 587 ishlaydi
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // true faqat 465 port uchun
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false // Railway SSL muammosini hal qiladi
-  },
-  pool: true,
-  maxConnections: 5,
-});
+// ✅ RESEND API — Railway SMTP blokini chetlab o'tadi (HTTP request)
+// nodemailer o'chirildi, chunki Railway barcha SMTP portlarni bloklaydi
+const sendEmail = async (to, subject, html) => {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-// Email yuborishdan oldin ulanishni tekshirish
-transporter.verify((error) => {
-  if (error) {
-    console.error('❌ Email transporter xatolik:', error.message);
-  } else {
-    console.log('✅ Email server tayyor!');
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY env da sozlanmagan!');
+    return false;
   }
-});
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Ustoz Yordamchi AI <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        html
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error(`❌ Resend xatolik (${to}):`, JSON.stringify(data));
+      return false;
+    }
+
+    console.log(`✅ Email yuborildi: ${to} | id: ${data.id}`);
+    return true;
+  } catch (e) {
+    console.error(`❌ Email fetch xatolik (${to}):`, e.message);
+    return false;
+  }
+};
 
 const sendCode = (email, code) => {
-  transporter.sendMail({
-    from: `"Ustoz Yordamchi AI" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Tasdiqlash kodi',
-    html: `<div style="font-family:Arial;padding:30px;background:#0a0e1a;color:#e8edf8;border-radius:12px;max-width:400px">
+  const subject = 'Tasdiqlash kodi — Ustoz Yordamchi AI';
+  const html = `
+    <div style="font-family:Arial;padding:30px;background:#0a0e1a;color:#e8edf8;border-radius:12px;max-width:400px">
       <h2 style="color:#5b8dee;margin-bottom:8px">🤖 Ustoz Yordamchi AI</h2>
       <p style="color:#94a3b8;margin-bottom:24px">Sizning tasdiqlash kodingiz:</p>
       <div style="background:#141d35;border:2px solid #5b8dee;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
         <span style="font-size:42px;font-weight:900;letter-spacing:12px;color:#5b8dee">${code}</span>
       </div>
       <p style="color:#64748b;font-size:13px">Kod 10 daqiqa davomida amal qiladi.</p>
-    </div>`
-  }).then(() => {
-    console.log(`✅ Email yuborildi: ${email}`);
-  }).catch(e => {
-    console.error(`❌ Email xatolik (${email}):`, e.message);
-  });
+    </div>
+  `;
+  sendEmail(email, subject, html).catch(e => console.error('sendCode xatolik:', e.message));
 };
 
 const genCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// REGISTER - Step 1: validate, save, send code
+// ─────────────────────────────────────────────
+// REGISTER — Step 1: validate, save, send code
+// ─────────────────────────────────────────────
 router.post('/register/send-code', async (req, res) => {
   const { login, full_name, phone, email, group_name, password } = req.body;
   const db = req.app.get('db');
@@ -90,7 +100,9 @@ router.post('/register/send-code', async (req, res) => {
   }
 });
 
-// REGISTER - Step 2: verify code
+// ─────────────────────────────────────────────
+// REGISTER — Step 2: verify code
+// ─────────────────────────────────────────────
 router.post('/register/verify', async (req, res) => {
   const { email, code } = req.body;
   const db = req.app.get('db');
@@ -122,7 +134,9 @@ router.post('/register/verify', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // Re-verify
+// ─────────────────────────────────────────────
 router.post('/register/re-verify', async (req, res) => {
   const { email } = req.body;
   const db = req.app.get('db');
@@ -140,7 +154,9 @@ router.post('/register/re-verify', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // STUDENT LOGIN
+// ─────────────────────────────────────────────
 router.post('/login/student', async (req, res) => {
   const { email, password } = req.body;
   const db = req.app.get('db');
@@ -159,7 +175,9 @@ router.post('/login/student', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // MENTOR LOGIN
+// ─────────────────────────────────────────────
 router.post('/login/mentor', async (req, res) => {
   const { phone, password } = req.body;
   const db = req.app.get('db');
@@ -178,7 +196,9 @@ router.post('/login/mentor', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // ADMIN LOGIN
+// ─────────────────────────────────────────────
 router.post('/login/admin', async (req, res) => {
   const { password } = req.body;
   if (password !== 'sonnet123') return res.status(401).json({ error: 'Parol noto\'g\'ri' });
@@ -186,7 +206,9 @@ router.post('/login/admin', async (req, res) => {
   res.json({ token, role: 'admin' });
 });
 
-// FORGOT PASSWORD - send code
+// ─────────────────────────────────────────────
+// FORGOT PASSWORD — send code
+// ─────────────────────────────────────────────
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   const db = req.app.get('db');
@@ -204,7 +226,9 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// FORGOT PASSWORD - verify code, send new password
+// ─────────────────────────────────────────────
+// FORGOT PASSWORD — verify & send new password
+// ─────────────────────────────────────────────
 router.post('/forgot-password/verify', async (req, res) => {
   const { email, code } = req.body;
   const db = req.app.get('db');
@@ -220,11 +244,8 @@ router.post('/forgot-password/verify', async (req, res) => {
     const hash = await bcrypt.hash(newPassword, 8);
     await db.query('UPDATE users SET password_hash=$1, verification_code=null WHERE email=$2', [hash, email]);
 
-    transporter.sendMail({
-      from: `"Ustoz Yordamchi AI" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Yangi parolingiz',
-      html: `<div style="font-family:Arial;padding:30px;background:#0a0e1a;color:#e8edf8;border-radius:12px;max-width:400px">
+    const html = `
+      <div style="font-family:Arial;padding:30px;background:#0a0e1a;color:#e8edf8;border-radius:12px;max-width:400px">
         <h2 style="color:#5b8dee">🤖 Ustoz Yordamchi AI</h2>
         <p style="color:#94a3b8">Sizning yangi kirish ma'lumotlaringiz:</p>
         <div style="background:#141d35;border-radius:10px;padding:16px;margin:16px 0">
@@ -232,8 +253,9 @@ router.post('/forgot-password/verify', async (req, res) => {
           <p><b style="color:#94a3b8">Parol:</b> <span style="color:#5b8dee">${newPassword}</span></p>
         </div>
         <p style="color:#64748b;font-size:13px">Tizimga kirgach parolni o'zgartiring!</p>
-      </div>`
-    }).catch(e => console.error('Email xatolik:', e.message));
+      </div>
+    `;
+    sendEmail(email, 'Yangi parolingiz — Ustoz Yordamchi AI', html);
 
     res.json({ message: 'Yangi login va parol emailga yuborildi' });
   } catch (e) {
