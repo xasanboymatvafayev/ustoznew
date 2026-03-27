@@ -12,19 +12,19 @@ const geminiCheck = async (assignmentTitle, studentAnswer) => {
     throw new Error('Groq API key sozlanmagan. Frontend .env faylga REACT_APP_GROQ_KEY qo\'shing.');
   }
 
-  const prompt = `Sen o'qituvchisan. O'quvchining javobini vazifa shartiga qarab tekshir va to'g'ri baho ber.
+  const prompt = `You are a strict but fair teacher grading a student's answer.
 
-Vazifa sharti: ${assignmentTitle}
-O'quvchi javobi: ${studentAnswer}
+TASK: "${assignmentTitle}"
+STUDENT ANSWER: "${studentAnswer}"
 
-MUHIM QOIDALAR:
-- Agar javob vazifa shartiga to'g'ri bo'lsa, yuqori ball ber (80-100)
-- Agar javob to'liq to'g'ri bo'lsa (masalan 5+5=? ga "10" desa), 100 ball ber
-- Faqat noto'g'ri yoki yetarli bo'lmasa past ball ber
-- Javobni qisqa va aniq yoz
+GRADING RULES:
+- If the student's answer is CORRECT for the given task, give 90-100 points
+- If partially correct, give 50-80 points
+- If wrong or empty, give 0-40 points
+- Be generous if the answer matches the task
 
-Faqat quyidagi formatda javob ber:
-**Baho: [0-100]**
+Respond ONLY in this exact format (write in Uzbek language):
+**Baho: [number 0-100]**
 **Xatolar:** [xatolar yoki "Xato yo'q"]
 **Yaxshi tomonlari:** [nima yaxshi]
 **Maslahat:** [qo'shimcha maslahat]`;
