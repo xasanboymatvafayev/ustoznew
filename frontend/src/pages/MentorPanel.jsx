@@ -18,13 +18,14 @@ TASK: "${assignmentTitle}"
 STUDENT ANSWER: "${studentAnswer}"
 
 GRADING RULES:
-- If the student's answer is CORRECT for the given task, give 90-100 points
-- If partially correct, give 50-80 points
-- If wrong or empty, give 0-40 points
+- Score is out of 10 (not 100)
+- If the student's answer is CORRECT for the given task, give 9-10 points
+- If partially correct, give 5-8 points
+- If wrong or empty, give 0-4 points
 - Be generous if the answer matches the task
 
 Respond ONLY in this exact format (write in Uzbek language):
-**Baho: [number 0-100]**
+**Baho: [number 0-10]**
 **Xatolar:** [xatolar yoki "Xato yo'q"]
 **Yaxshi tomonlari:** [nima yaxshi]
 **Maslahat:** [qo'shimcha maslahat]`;
