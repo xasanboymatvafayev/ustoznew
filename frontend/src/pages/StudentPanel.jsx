@@ -411,7 +411,16 @@ function StudentClasswork() {
     const r = await API.get('/student/assignments/classwork');
     setAssignments(r.data);
     const t = {};
-    r.data.forEach(a => { if (a.is_open && a.duration_minutes) t[a.id] = a.duration_minutes * 60; });
+    const now = Date.now();
+    r.data.forEach(a => {
+      if (a.is_open && a.duration_minutes && a.created_at) {
+        const startedAt = new Date(a.created_at).getTime();
+        const totalSec = a.duration_minutes * 60;
+        const elapsed = Math.floor((now - startedAt) / 1000);
+        const remaining = totalSec - elapsed;
+        t[a.id] = remaining > 0 ? remaining : 0;
+      }
+    });
     setTimers(t);
   };
 
