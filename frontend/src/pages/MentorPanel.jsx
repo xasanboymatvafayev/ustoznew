@@ -3,35 +3,49 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import API from '../utils/api';
 
-const GEMINI_KEY = 'AIzaSyBtQGQ35oZNNY87l_HGsBYQ5QYBRgvgwM4';
+// ✅ TUZATILDI: API key env o'zgaruvchisidan o'qiladi
+// frontend/.env ga qo'shing: REACT_APP_GEMINI_KEY=sizning_keyingiz
+const GEMINI_KEY = process.env.REACT_APP_GEMINI_KEY || '';
 
+// ✅ TUZATILDI: model nomi to'g'irlandi (gemini-2.0-flash → gemini-1.5-flash)
+// va xatolik tekshiruvi qo'shildi
 const geminiCheck = async (assignmentTitle, content) => {
+  if (!GEMINI_KEY) {
+    throw new Error('Gemini API key sozlanmagan. Frontend .env faylga REACT_APP_GEMINI_KEY qo\'shing.');
+  }
+
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `Sen dasturlash o'qituvchisisisan. Quyidagi vazifani tekshir va 0-100 ball baho ber.
-
-Vazifa: ${assignmentTitle}
-O'quvchi javobi:
-${content}
-
-Quyidagi formatda javob ber (boshqa hech narsa yozma):
-**Baho: [0-100]**
-**Xatolar:** [xatolar yoki "Xato yo'q"]
-**Yaxshi tomonlari:** [nima yaxshi]
-**Maslahat:** [qo'shimcha maslahat]`
+            text: `Sen dasturlash o'qituvchisisisan. Quyidagi vazifani tekshir va 0-100 ball baho ber.\n\nVazifa: ${assignmentTitle}\nO'quvchi javobi:\n${content}\n\nQuyidagi formatda javob ber (boshqa hech narsa yozma):\n**Baho: [0-100]**\n**Xatolar:** [xatolar yoki "Xato yo'q"]\n**Yaxshi tomonlari:** [nima yaxshi]\n**Maslahat:** [qo'shimcha maslahat]`
           }]
-        }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1024,
+        }
       })
     }
   );
+
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'AI javob bera olmadi';
+
+  // ✅ TUZATILDI: API xatoliklarini aniq ko'rsatish
+  if (data.error) {
+    console.error('Gemini API xatolik:', data.error);
+    throw new Error(`Gemini xatolik: ${data.error.message || data.error.status}`);
+  }
+
+  if (!data.candidates || data.candidates.length === 0) {
+    throw new Error('Gemini javob bermadi. Keyinroq urinib ko\'ring.');
+  }
+
+  return data.candidates[0]?.content?.parts?.[0]?.text || 'AI javob bera olmadi';
 };
 
 const Sidebar = ({ active, setActive, logout, mentor }) => {
@@ -196,7 +210,7 @@ function HomeworkView({ group }) {
   const [showSubs, setShowSubs] = useState(null);
   const [subs, setSubs] = useState([]);
   const [aiLoading, setAiLoading] = useState({});
-  const [manualGrade, setManualGrade] = useState({}); // {subId: {score, feedback}}
+  const [manualGrade, setManualGrade] = useState({});
   const [showManual, setShowManual] = useState({});
 
   useEffect(() => { load(); }, []);
@@ -223,12 +237,15 @@ function HomeworkView({ group }) {
     setAiLoading(p => ({ ...p, [s.id]: true }));
     try {
       const feedback = await geminiCheck(assignmentTitle, s.content);
-      // Extract score from feedback
       const scoreMatch = feedback.match(/Baho:\s*(\d+)/);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
       await API.put(`/mentor/submissions/${s.id}/grade`, { score, mentor_feedback: feedback });
       loadSubs(showSubs);
-    } catch (e) { alert('Gemini AI xatolik: ' + e.message); }
+    } catch (e) {
+      // ✅ TUZATILDI: xatolikni aniq ko'rsatish
+      alert('🤖 AI xatolik: ' + e.message);
+      console.error('Gemini xatolik:', e);
+    }
     setAiLoading(p => ({ ...p, [s.id]: false }));
   };
 
@@ -292,21 +309,17 @@ function HomeworkView({ group }) {
                     </div>
                   </div>
 
-                  {/* Answer */}
                   <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '10px', fontSize: '13px', fontFamily: 'monospace', marginBottom: '10px', whiteSpace: 'pre-wrap', maxHeight: '160px', overflowY: 'auto' }}>
                     {s.content}
                   </div>
 
-                  {/* AI feedback */}
                   {s.mentor_feedback && (
                     <div style={{ background: 'rgba(91,141,238,0.08)', border: '1px solid rgba(91,141,238,0.2)', borderRadius: '8px', padding: '10px', fontSize: '12px', marginBottom: '10px', whiteSpace: 'pre-wrap', color: 'var(--text2)' }}>
                       🤖 {s.mentor_feedback}
                     </div>
                   )}
 
-                  {/* Action buttons */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {/* AI check */}
                     <button className="btn btn-sm"
                       style={{ background: 'rgba(91,141,238,0.15)', color: 'var(--accent)', border: '1px solid rgba(91,141,238,0.3)' }}
                       onClick={() => handleAiCheck(s, a.title)}
@@ -314,7 +327,6 @@ function HomeworkView({ group }) {
                       {aiLoading[s.id] ? '⏳ AI tekshirmoqda...' : '🤖 AI tekshirish'}
                     </button>
 
-                    {/* Manual grade */}
                     <button className="btn btn-sm"
                       style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--success)', border: '1px solid rgba(16,185,129,0.3)' }}
                       onClick={() => setShowManual(p => ({ ...p, [s.id]: !p[s.id] }))}>
@@ -322,7 +334,6 @@ function HomeworkView({ group }) {
                     </button>
                   </div>
 
-                  {/* Manual grade form */}
                   {showManual[s.id] && (
                     <div style={{ marginTop: '10px', background: 'var(--bg3)', borderRadius: '10px', padding: '14px', border: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
@@ -438,7 +449,10 @@ function ClassworkView({ group }) {
       const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
       await API.put(`/mentor/submissions/${s.id}/grade`, { score, mentor_feedback: feedback });
       loadSubs(showSubs);
-    } catch (e) { alert('Gemini xatolik: ' + e.message); }
+    } catch (e) {
+      alert('🤖 AI xatolik: ' + e.message);
+      console.error('Gemini xatolik:', e);
+    }
     setAiLoading(p => ({ ...p, [s.id]: false }));
   };
 
@@ -695,8 +709,6 @@ function ScheduleView({ group }) {
 
   const dates = getLessonDates();
   const members = scheduleData?.members || [];
-
-  // Sort members by total score desc
   const sorted = [...members].sort((a, b) => getTotal(b.id) - getTotal(a.id));
 
   return (
