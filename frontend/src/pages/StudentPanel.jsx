@@ -74,37 +74,208 @@ export default function StudentPanel() {
 
 // ── DASHBOARD ──
 function StudentDashboard({ data }) {
+  const [attendance, setAttendance] = useState([]);
+  const [clock, setClock] = useState(new Date());
+
+  useEffect(() => {
+    API.get('/student/attendance').then(r => setAttendance(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   if (!data) return <div className="loading"><div className="spinner" /></div>;
+
+  const group = data.groups?.[0];
+
+  // Dars kunlarini hisoblash
+  const getLessonDates = (g) => {
+    if (!g?.start_date || !g?.end_date) return new Set();
+    const dates = new Set();
+    let d = new Date(g.start_date);
+    const end = new Date(g.end_date);
+    while (d <= end) {
+      const day = d.getDay();
+      let ok = false;
+      if (g.lesson_days === 'juft') ok = [1, 3, 5].includes(day);
+      else if (g.lesson_days === 'toq') ok = [2, 4, 6].includes(day);
+      else ok = day !== 0;
+      if (ok) dates.add(d.toISOString().slice(0, 10));
+      d.setDate(d.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const lessonDates = group ? getLessonDates(group) : new Set();
+
+  // Attendance map: {date: 'present'|'absent'}
+  const attMap = {};
+  attendance.forEach(a => { attMap[a.lesson_date?.slice(0, 10)] = a.status; });
+
+  // Bugun dars bormi?
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayHasLesson = lessonDates.has(todayStr);
+
+  // Soat formatlash
+  const pad = n => String(n).padStart(2, '0');
+  const timeStr = `${pad(clock.getHours())}:${pad(clock.getMinutes())}:${pad(clock.getSeconds())}`;
+  const lessonType = group?.lesson_days === 'juft' ? 'Juft kunlar' : group?.lesson_days === 'toq' ? 'Toq kunlar' : 'Har kuni';
+
+  // Kalendar (joriy oy)
+  const now = clock;
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthNames = ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'];
+  const dayNames = ['Du','Se','Ch','Pa','Ju','Sh','Ya'];
+  // Adjust: start from Monday
+  const startOffset = (firstDay + 6) % 7; // Mon=0
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
   return (
     <div className="fade-in">
       <div className="page-header">
         <h2>Salom, {data.user?.full_name?.split(' ')[0]}! 👋</h2>
         <p>Bugungi faoliyatingiz</p>
       </div>
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div style={{ fontSize: '28px' }}>🏫</div>
-          <div className="stat-value" style={{ color: 'var(--accent)' }}>{data.groups?.length || 0}</div>
-          <div className="stat-label">Guruhlarim</div>
+
+      {/* Clock + Dars info */}
+      {group && (
+        <div className="card" style={{ marginBottom: '16px', background: 'linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%)', color: '#fff', border: 'none' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <div style={{ fontSize: '13px', opacity: 0.85, marginBottom: '4px' }}>{lessonType}</div>
+              <div style={{ fontSize: '32px', fontFamily: 'var(--font2)', fontWeight: '700', letterSpacing: '1px' }}>
+                🕐 {timeStr}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '13px', opacity: 0.85 }}>{group.name}</div>
+              {group.lesson_time && <div style={{ fontSize: '20px', fontWeight: '700', marginTop: '4px' }}>⏰ {group.lesson_time?.slice(0,5)}</div>}
+              <div style={{
+                marginTop: '8px', padding: '6px 14px', borderRadius: '20px', fontSize: '14px', fontWeight: '700',
+                background: todayHasLesson ? 'rgba(34,197,94,0.9)' : 'rgba(0,0,0,0.25)',
+                display: 'inline-block'
+              }}>
+                {todayHasLesson ? '✅ Bugun dars bor!' : '😴 Bugun dars yo\'q'}
+              </div>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Stats */}
+      <div className="stats-grid" style={{ marginBottom: '16px' }}>
         <div className="stat-card">
           <div style={{ fontSize: '28px' }}>📋</div>
           <div className="stat-value" style={{ color: 'var(--warning)' }}>{data.pending_assignments || 0}</div>
           <div className="stat-label">Kutayotgan vazifalar</div>
         </div>
+        <div className="stat-card">
+          <div style={{ fontSize: '28px' }}>✅</div>
+          <div className="stat-value" style={{ color: 'var(--success)' }}>{attendance.filter(a => a.status === 'present').length}</div>
+          <div className="stat-label">Darsda bo'lganlar</div>
+        </div>
+        <div className="stat-card">
+          <div style={{ fontSize: '28px' }}>❌</div>
+          <div className="stat-value" style={{ color: 'var(--danger)' }}>{attendance.filter(a => a.status === 'absent').length}</div>
+          <div className="stat-label">Qoldirilgan darslar</div>
+        </div>
       </div>
-      {data.groups?.map(g => (
-        <div key={g.id} className="card" style={{ marginBottom: '12px' }}>
-          <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '6px' }}>{g.name}</h3>
-          <p style={{ fontSize: '13px', color: 'var(--text2)' }}>{g.subject || '—'}</p>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <span className="tag tag-blue">
-              {g.lesson_days === 'juft' ? 'Juft kunlar' : g.lesson_days === 'toq' ? 'Toq kunlar' : 'Har kuni'}
-            </span>
-            {g.lesson_time && <span className="tag tag-purple">🕐 {g.lesson_time}</span>}
+
+      {/* Calendar */}
+      {group && (
+        <div className="card">
+          <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>
+            📅 {monthNames[month]} {year}
+          </h3>
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            {[
+              { color: 'rgba(34,197,94,0.25)', border: '1.5px solid rgba(34,197,94,0.6)', label: 'Keldim ✅' },
+              { color: 'rgba(239,68,68,0.15)', border: '1.5px solid rgba(239,68,68,0.4)', label: 'Kelmadim ❌' },
+              { color: 'rgba(91,141,238,0.15)', border: '1.5px solid var(--accent)', label: 'Dars kuni 📚' },
+              { color: 'rgba(250,204,21,0.2)', border: '2px solid var(--warning)', label: 'Bugun 📍' },
+            ].map((l, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text2)' }}>
+                <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: l.color, border: l.border }} />
+                {l.label}
+              </div>
+            ))}
+          </div>
+
+          {/* Day headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
+            {dayNames.map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text3)', padding: '4px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Days grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+            {cells.map((day, idx) => {
+              if (!day) return <div key={`empty-${idx}`} />;
+              const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+              const isToday = dateStr === todayStr;
+              const isLesson = lessonDates.has(dateStr);
+              const attStatus = attMap[dateStr]; // 'present', 'absent', or undefined
+              const isFuture = dateStr > todayStr;
+
+              let bg = 'transparent';
+              let border = '1.5px solid transparent';
+              let color = 'var(--text)';
+              let emoji = '';
+
+              if (isToday) {
+                border = '2px solid var(--warning)';
+                bg = 'rgba(250,204,21,0.15)';
+                color = 'var(--warning)';
+              }
+              if (isLesson && !isFuture) {
+                if (attStatus === 'present') {
+                  bg = 'rgba(34,197,94,0.2)';
+                  border = '1.5px solid rgba(34,197,94,0.55)';
+                  color = 'var(--success)';
+                  emoji = '✓';
+                } else if (attStatus === 'absent') {
+                  bg = 'rgba(239,68,68,0.13)';
+                  border = '1.5px solid rgba(239,68,68,0.35)';
+                  color = 'var(--danger)';
+                  emoji = '✗';
+                } else {
+                  // lesson day but no attendance recorded yet
+                  if (!isToday) {
+                    bg = 'rgba(91,141,238,0.1)';
+                    border = '1.5px solid rgba(91,141,238,0.3)';
+                    color = 'var(--accent)';
+                  }
+                }
+              }
+              if (isLesson && isFuture) {
+                bg = 'rgba(91,141,238,0.08)';
+                border = '1.5px solid rgba(91,141,238,0.2)';
+                color = 'var(--accent)';
+              }
+
+              return (
+                <div key={dateStr} style={{
+                  aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: '8px', background: bg, border, cursor: 'default', transition: 'all 0.15s',
+                }} title={isLesson ? (attStatus === 'present' ? 'Keldim ✅' : attStatus === 'absent' ? 'Kelmadim ❌' : 'Dars kuni') : ''}>
+                  <span style={{ fontSize: '13px', fontWeight: isToday ? '800' : isLesson ? '700' : '400', color }}>{day}</span>
+                  {emoji && <span style={{ fontSize: '9px', lineHeight: 1 }}>{emoji}</span>}
+                </div>
+              );
+            })}
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }
