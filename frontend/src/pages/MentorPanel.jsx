@@ -15,7 +15,7 @@ const geminiCheck = async (assignmentTitle, content) => {
   }
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -427,8 +427,19 @@ function ClassworkView({ group }) {
     const cw = r.data.filter(a => a.type === 'classwork');
     setAssignments(cw);
     const t = {};
-    cw.forEach(a => { if (a.is_open && a.duration_minutes) t[a.id] = a.duration_minutes * 60; });
-    setTimers(p => ({ ...p, ...t }));
+    const now = Date.now();
+    cw.forEach(a => {
+      if (a.is_open && a.duration_minutes && a.created_at) {
+        // Server vaqtidan hisoblash — kim kirganda ham bir xil bo'ladi
+        const startedAt = new Date(a.created_at).getTime();
+        const totalSec = a.duration_minutes * 60;
+        const elapsed = Math.floor((now - startedAt) / 1000);
+        const remaining = totalSec - elapsed;
+        if (remaining > 0) t[a.id] = remaining;
+        else t[a.id] = 0;
+      }
+    });
+    setTimers(t);
   };
 
   const handleAdd = async (e) => {
