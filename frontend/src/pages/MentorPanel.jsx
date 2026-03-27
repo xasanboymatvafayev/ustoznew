@@ -22,7 +22,22 @@ const geminiCheck = async (assignmentTitle, content) => {
       model: 'llama-3.3-70b-versatile',
       messages: [{
         role: 'user',
-        content: `Sen dasturlash o'qituvchisisisan. Quyidagi vazifani tekshir va 0-100 ball baho ber.\n\nVazifa: ${assignmentTitle}\nO'quvchi javobi:\n${content}\n\nQuyidagi formatda javob ber (boshqa hech narsa yozma):\n**Baho: [0-100]**\n**Xatolar:** [xatolar yoki "Xato yo'q"]\n**Yaxshi tomonlari:** [nima yaxshi]\n**Maslahat:** [qo'shimcha maslahat]`
+        content: `Sen o'qituvchisan. O'quvchining javobini vazifa shartiga qarab tekshir va to'g'ri baho ber.
+
+Vazifa sharti: ${assignmentTitle}
+O'quvchi javobi: ${content}
+
+MUHIM QOIDALAR:
+- Agar javob vazifa shartiga to'g'ri bo'lsa, yuqori ball ber (80-100)
+- Agar javob to'liq to'g'ri bo'lsa (masalan 5+5=10 ga "10" desa), 100 ball ber
+- Faqat noto'g'ri yoki yetarli bo'lmasa past ball ber
+- Javobni qisqa va aniq yoz
+
+Faqat quyidagi formatda javob ber:
+**Baho: [0-100]**
+**Xatolar:** [xatolar yoki "Xato yo'q"]
+**Yaxshi tomonlari:** [nima yaxshi]
+**Maslahat:** [qo'shimcha maslahat]`
       }],
       temperature: 0.3,
       max_tokens: 1024,
