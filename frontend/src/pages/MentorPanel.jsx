@@ -179,6 +179,7 @@ function GroupDetail({ group, view, setView, onBack }) {
     { id: 'classwork', label: '⏱️ Darsda vazifa' },
     { id: 'chat', label: '💬 Chat' },
     { id: 'schedule', label: '📊 Jadval' },
+    { id: 'attendance', label: '✅ Davomat' },
   ];
   return (
     <div className="fade-in">
@@ -197,6 +198,7 @@ function GroupDetail({ group, view, setView, onBack }) {
       {view === 'classwork' && <ClassworkView group={group} />}
       {view === 'chat' && <ChatView group={group} />}
       {view === 'schedule' && <ScheduleView group={group} />}
+      {view === 'attendance' && <AttendanceView group={group} />}
     </div>
   );
 }
@@ -812,6 +814,231 @@ function ScheduleView({ group }) {
               </div>
               <button className="btn btn-primary" type="submit" style={{ width: '100%' }}>✅ Qo'shish</button>
             </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ATTENDANCE VIEW ──
+function AttendanceView({ group }) {
+  const getLessonDates = () => {
+    const { lesson_days, start_date, end_date } = group;
+    if (!start_date || !end_date) return [];
+    const dates = [];
+    let d = new Date(start_date);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const endD = new Date(end_date) < today ? new Date(end_date) : today;
+    while (d <= endD) {
+      const day = d.getDay();
+      let ok = false;
+      if (lesson_days === 'juft') ok = [1, 3, 5].includes(day);
+      else if (lesson_days === 'toq') ok = [2, 4, 6].includes(day);
+      else ok = day !== 0;
+      if (ok) dates.push(d.toISOString().slice(0, 10));
+      d.setDate(d.getDate() + 1);
+    }
+    return dates.reverse(); // latest first
+  };
+
+  const allDates = getLessonDates();
+  const [selectedDate, setSelectedDate] = useState(allDates[0] || '');
+  const [members, setMembers] = useState([]);
+  const [attendance, setAttendance] = useState({}); // {user_id: 'present'|'absent'}
+  const [history, setHistory] = useState([]); // all attendance records
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [tab, setTab] = useState('mark'); // 'mark' | 'history'
+
+  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { if (selectedDate) loadForDate(selectedDate); }, [selectedDate]);
+
+  const loadHistory = async () => {
+    try {
+      const r = await API.get(`/mentor/groups/${group.id}/attendance/history`);
+      setHistory(r.data);
+    } catch {}
+  };
+
+  const loadForDate = async (date) => {
+    try {
+      const r = await API.get(`/mentor/groups/${group.id}/attendance?date=${date}`);
+      setMembers(r.data.members);
+      const att = {};
+      r.data.members.forEach(m => att[m.id] = 'present'); // default present
+      r.data.attendance.forEach(a => { att[a.user_id] = a.status; });
+      setAttendance(att);
+    } catch {}
+  };
+
+  const toggle = (uid) => {
+    setAttendance(p => ({ ...p, [uid]: p[uid] === 'present' ? 'absent' : 'present' }));
+    setSaved(false);
+  };
+
+  const markAll = (status) => {
+    const att = {};
+    members.forEach(m => att[m.id] = status);
+    setAttendance(att);
+    setSaved(false);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    const records = members.map(m => ({ user_id: m.id, status: attendance[m.id] || 'present' }));
+    await API.post(`/mentor/groups/${group.id}/attendance`, { date: selectedDate, records });
+    setSaving(false); setSaved(true);
+    loadHistory();
+  };
+
+  // Per-student stats from history
+  const getStats = (uid) => {
+    const mine = history.filter(h => h.user_id === uid);
+    const present = mine.filter(h => h.status === 'present').length;
+    const absent = mine.filter(h => h.status === 'absent').length;
+    return { present, absent, total: mine.length };
+  };
+
+  const presentCount = members.filter(m => attendance[m.id] === 'present').length;
+  const absentCount = members.filter(m => attendance[m.id] === 'absent').length;
+
+  return (
+    <div className="fade-in">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ fontFamily: 'var(--font2)' }}>✅ Davomat</h3>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className={`btn btn-sm ${tab === 'mark' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('mark')}>📝 Belgilash</button>
+          <button className={`btn btn-sm ${tab === 'history' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('history')}>📊 Tarix</button>
+        </div>
+      </div>
+
+      {tab === 'mark' && (
+        <>
+          {/* Date selector */}
+          <div className="card" style={{ marginBottom: '16px', padding: '16px' }}>
+            <label style={{ fontSize: '13px', color: 'var(--text3)', display: 'block', marginBottom: '8px' }}>📅 Dars kunini tanlang:</label>
+            {allDates.length === 0 ? (
+              <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Guruhda boshlash/tugash sanasi kiritilmagan</p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {allDates.slice(0, 20).map(date => {
+                  const hasData = history.some(h => h.lesson_date?.slice(0,10) === date);
+                  return (
+                    <button key={date} onClick={() => setSelectedDate(date)}
+                      style={{
+                        padding: '6px 12px', borderRadius: '8px', fontSize: '13px', border: '1px solid var(--border)',
+                        cursor: 'pointer', fontWeight: selectedDate === date ? '700' : '400',
+                        background: selectedDate === date ? 'var(--accent)' : hasData ? 'rgba(34,197,94,0.12)' : 'var(--bg2)',
+                        color: selectedDate === date ? '#fff' : hasData ? 'var(--success)' : 'var(--text)',
+                      }}>
+                      {date.slice(5)} {hasData ? '✓' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {selectedDate && members.length > 0 && (
+            <>
+              {/* Quick stats */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                <div style={{ padding: '10px 16px', background: 'rgba(34,197,94,0.12)', borderRadius: '10px', border: '1px solid rgba(34,197,94,0.3)' }}>
+                  <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--success)' }}>{presentCount}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text3)', marginLeft: '6px' }}>keldi</span>
+                </div>
+                <div style={{ padding: '10px 16px', background: 'rgba(239,68,68,0.1)', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--danger)' }}>{absentCount}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text3)', marginLeft: '6px' }}>kelmadi</span>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={() => markAll('present')}>✅ Barchasi keldi</button>
+                <button className="btn btn-danger btn-sm" onClick={() => markAll('absent')}>❌ Barchasi kelmadi</button>
+              </div>
+
+              {/* Members list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {members.map((m, idx) => {
+                  const st = getStats(m.id);
+                  const isPresent = attendance[m.id] !== 'absent';
+                  return (
+                    <div key={m.id} onClick={() => toggle(m.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '12px 16px', borderRadius: '12px', cursor: 'pointer',
+                        border: `1.5px solid ${isPresent ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.3)'}`,
+                        background: isPresent ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.06)',
+                        transition: 'all 0.18s',
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: isPresent ? 'var(--success)' : 'var(--danger)', color: '#fff', fontWeight: '700', fontSize: '14px'
+                        }}>
+                          {isPresent ? '✓' : '✗'}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: '600', fontSize: '14px' }}>{idx + 1}. {m.full_name}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
+                            📊 {st.present} keldi · {st.absent} kelmadi ({st.total} ta dars)
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{
+                        padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
+                        background: isPresent ? 'var(--success)' : 'var(--danger)', color: '#fff'
+                      }}>
+                        {isPresent ? 'Keldi ✅' : 'Kelmadi ❌'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={save} disabled={saving}>
+                {saving ? '⏳ Saqlanmoqda...' : saved ? '✅ Saqlandi!' : '💾 Davomatni saqlash'}
+              </button>
+            </>
+          )}
+        </>
+      )}
+
+      {tab === 'history' && (
+        <div>
+          {members.length === 0 && <div className="loading"><div className="spinner" /></div>}
+          {/* Stats table per student */}
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th><th>O'quvchi</th><th style={{ textAlign: 'center' }}>✅ Keldi</th>
+                  <th style={{ textAlign: 'center' }}>❌ Kelmadi</th><th style={{ textAlign: 'center' }}>% Davomat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m, idx) => {
+                  const st = getStats(m.id);
+                  const pct = st.total > 0 ? Math.round(st.present / st.total * 100) : 0;
+                  return (
+                    <tr key={m.id}>
+                      <td style={{ color: 'var(--text3)' }}>{idx + 1}</td>
+                      <td><b>{m.full_name}</b></td>
+                      <td style={{ textAlign: 'center', color: 'var(--success)', fontWeight: '700' }}>{st.present}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--danger)', fontWeight: '700' }}>{st.absent}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                          <div style={{ width: '60px', height: '6px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct}%`, height: '100%', background: pct >= 75 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)', borderRadius: '3px' }} />
+                          </div>
+                          <span style={{ color: pct >= 75 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)', fontWeight: '700', fontSize: '13px' }}>{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
