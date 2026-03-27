@@ -1,7 +1,46 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import emailjs from '@emailjs/browser';
 import API from '../utils/api';
+
+// ✅ EmailJS sozlamalari — .env dan o'qiladi
+const EJS_SERVICE  = process.env.REACT_APP_EMAILJS_SERVICE;
+const EJS_TEMPLATE = process.env.REACT_APP_EMAILJS_TEMPLATE;
+const EJS_KEY      = process.env.REACT_APP_EMAILJS_KEY;
+
+// ✅ EmailJS orqali tasdiqlash kodi yuborish
+// Template da bu o'zgaruvchilar bo'lishi kerak:
+//   {{to_email}}  — kimga
+//   {{to_name}}   — ism
+//   {{code}}      — tasdiqlash kodi
+const sendVerificationEmail = async (toEmail, toName, code) => {
+  await emailjs.send(
+    EJS_SERVICE,
+    EJS_TEMPLATE,
+    {
+      to_email: toEmail,
+      to_name:  toName || 'Foydalanuvchi',
+      code:     code,
+    },
+    EJS_KEY
+  );
+};
+
+// ✅ Yangi parol emailga yuborish
+// Template da: {{to_email}}, {{to_name}}, {{login}}, {{new_password}}
+const sendNewPasswordEmail = async (toEmail, toName, login, newPassword) => {
+  await emailjs.send(
+    EJS_SERVICE,
+    EJS_TEMPLATE,
+    {
+      to_email:     toEmail,
+      to_name:      toName || 'Foydalanuvchi',
+      code:         `Login: ${login} | Parol: ${newPassword}`,
+    },
+    EJS_KEY
+  );
+};
 
 export default function LoginPage() {
   const [tab, setTab] = useState('mentor');
@@ -22,7 +61,7 @@ export default function LoginPage() {
   const [stuPass, setStuPass] = useState('');
 
   // Register
-  const [regStep, setRegStep] = useState(1); // 1=form, 2=verify code
+  const [regStep, setRegStep] = useState(1);
   const [regData, setRegData] = useState({
     login: '', full_name: '', phone: '', email: '', group_name: '', password: '', confirm: ''
   });
@@ -35,10 +74,10 @@ export default function LoginPage() {
   const [forgotCode, setForgotCode] = useState('');
 
   const clearMessages = () => { setError(''); setSuccess(''); };
-  const err = (msg) => { setError(msg); setLoading(false); };
+  const err  = (msg) => { setError(msg);   setLoading(false); };
   const succ = (msg) => { setSuccess(msg); setLoading(false); };
 
-  // ADMIN
+  // ── ADMIN ──
   const handleAdminLogin = async () => {
     setLoading(true); clearMessages();
     try {
@@ -48,7 +87,7 @@ export default function LoginPage() {
     } catch (e) { err(e.response?.data?.error || 'Parol noto\'g\'ri'); }
   };
 
-  // MENTOR
+  // ── MENTOR ──
   const handleMentorLogin = async (e) => {
     e.preventDefault(); setLoading(true); clearMessages();
     try {
@@ -58,7 +97,7 @@ export default function LoginPage() {
     } catch (e) { err(e.response?.data?.error || 'Telefon yoki parol noto\'g\'ri'); }
   };
 
-  // STUDENT LOGIN
+  // ── STUDENT LOGIN ──
   const handleStudentLogin = async (e) => {
     e.preventDefault(); setLoading(true); clearMessages();
     try {
@@ -68,21 +107,26 @@ export default function LoginPage() {
     } catch (e) { err(e.response?.data?.error || 'Email yoki parol noto\'g\'ri'); }
   };
 
-  // REGISTER step 1 — send code
+  // ── REGISTER step 1 — backend dan kod olib, EmailJS orqali yuborish ──
   const handleRegSendCode = async (e) => {
     e.preventDefault(); clearMessages(); setEmailExists(false);
     if (regData.password !== regData.confirm) return err('Parollar mos kelmadi');
     if (regData.password.length < 6) return err('Parol kamida 6 ta belgi bo\'lishi kerak');
     setLoading(true);
     try {
-      await API.post('/auth/register/send-code', {
-        login: regData.login,
-        full_name: regData.full_name,
-        phone: regData.phone,
-        email: regData.email,
+      // 1. Backend dan kod olish
+      const res = await API.post('/auth/register/send-code', {
+        login:      regData.login,
+        full_name:  regData.full_name,
+        phone:      regData.phone,
+        email:      regData.email,
         group_name: regData.group_name,
-        password: regData.password,
+        password:   regData.password,
       });
+
+      // 2. EmailJS orqali frontenddan yuborish
+      await sendVerificationEmail(regData.email, regData.full_name, res.data.code);
+
       setRegStep(2);
       succ('✅ Tasdiqlash kodi ' + regData.email + ' ga yuborildi!');
     } catch (e) {
@@ -95,32 +139,31 @@ export default function LoginPage() {
     }
   };
 
-  // REGISTER step 2 — verify code
+  // ── REGISTER step 2 — kodni tekshirish ──
   const handleRegVerify = async (e) => {
     e.preventDefault(); setLoading(true); clearMessages();
     try {
       const res = await API.post('/auth/register/verify', {
         email: regData.email,
-        code: regCode,
-        password: regData.password,
+        code:  regCode,
       });
       login(res.data.token, { ...res.data.user, role: 'student' });
       navigate('/student');
     } catch (e) { err(e.response?.data?.error || 'Kod noto\'g\'ri yoki muddati o\'tgan'); }
   };
 
-  // Eski akkauntni o'chirib yangi ochish
+  // ── Re-verify — eski akkauntni o'chirib yangi ochish ──
   const handleDeleteAndReregister = async () => {
     setLoading(true); clearMessages(); setEmailExists(false);
     try {
-      await API.post('/auth/register/re-verify', { email: regData.email });
+      const res = await API.post('/auth/register/re-verify', { email: regData.email });
+      await sendVerificationEmail(regData.email, regData.full_name, res.data.code);
       setRegStep(2);
-      succ('✅ Tasdiqlash kodi yuborildi. Kodni kiriting — eski akkount o\'chiriladi, yangi ochiladi.');
+      succ('✅ Tasdiqlash kodi yuborildi.');
     } catch (e) { err(e.response?.data?.error || 'Xatolik'); }
     setLoading(false);
   };
 
-  // Go to forgot from warning
   const handleGoForgot = () => {
     setForgotEmail(regData.email);
     setEmailExists(false);
@@ -128,31 +171,34 @@ export default function LoginPage() {
     clearMessages();
   };
 
-  // FORGOT step 1
+  // ── FORGOT step 1 — kod yuborish ──
   const handleForgotSend = async (e) => {
     e.preventDefault(); setLoading(true); clearMessages();
     try {
-      await API.post('/auth/forgot-password', { email: forgotEmail });
+      const res = await API.post('/auth/forgot-password', { email: forgotEmail });
+      await sendVerificationEmail(forgotEmail, '', res.data.code);
       setForgotStep(2);
       succ('✅ Tasdiqlash kodi yuborildi!');
     } catch (e) { err(e.response?.data?.error || 'Bu email topilmadi'); }
   };
 
-  // FORGOT step 2
+  // ── FORGOT step 2 — kodni tekshirib yangi parol olish ──
   const handleForgotVerify = async (e) => {
     e.preventDefault(); setLoading(true); clearMessages();
     try {
-      await API.post('/auth/forgot-password/verify', { email: forgotEmail, code: forgotCode });
+      const res = await API.post('/auth/forgot-password/verify', { email: forgotEmail, code: forgotCode });
+      // Yangi parolni EmailJS orqali yuborish
+      await sendNewPasswordEmail(forgotEmail, '', res.data.login, res.data.newPassword);
       succ('✅ Yangi login va parol emailingizga yuborildi!');
       setTimeout(() => { setTab('student'); setForgotStep(1); clearMessages(); }, 2500);
     } catch (e) { err(e.response?.data?.error || 'Kod noto\'g\'ri'); }
   };
 
   const tabs = [
-    { id: 'mentor', label: '👨‍🏫 Mentor' },
-    { id: 'student', label: '🎓 Kirish' },
+    { id: 'mentor',   label: '👨‍🏫 Mentor' },
+    { id: 'student',  label: '🎓 Kirish' },
     { id: 'register', label: '📝 Ro\'yxat' },
-    { id: 'forgot', label: '🔑 Parol' },
+    { id: 'forgot',   label: '🔑 Parol' },
   ];
 
   return (
@@ -222,7 +268,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {error && <div className="alert alert-error">⚠️ {error}</div>}
+          {error   && <div className="alert alert-error">⚠️ {error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 
           {/* ── MENTOR ── */}
@@ -276,7 +322,6 @@ export default function LoginPage() {
           {tab === 'register' && (
             <div className="fade-in">
 
-              {/* Email exists warning */}
               {emailExists && (
                 <div style={{
                   background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)',
@@ -286,13 +331,11 @@ export default function LoginPage() {
                   <p style={{ fontSize: '14px', fontWeight: '700', color: '#fbbf24', marginBottom: '6px' }}>
                     Bu email bilan avval ro'yxatdan o'tilgan!
                   </p>
-                  <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '16px' }}>
-                    Nima qilmoqchisiz?
-                  </p>
+                  <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '16px' }}>Nima qilmoqchisiz?</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <button className="btn" onClick={handleGoForgot}
                       style={{ background: 'rgba(91,141,238,0.15)', color: 'var(--accent)', border: '1px solid rgba(91,141,238,0.3)', justifyContent: 'center', padding: '11px' }}>
-                      🔑 Parolni tiklash (avvalgi akkauntga kirish)
+                      🔑 Parolni tiklash
                     </button>
                     <button className="btn" onClick={handleDeleteAndReregister} disabled={loading}
                       style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)', justifyContent: 'center', padding: '11px' }}>
@@ -306,7 +349,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Step 1 — Full form with password */}
+              {/* Step 1 */}
               {!emailExists && regStep === 1 && (
                 <form onSubmit={handleRegSendCode}>
                   <div className="form-group">
@@ -351,7 +394,7 @@ export default function LoginPage() {
                 </form>
               )}
 
-              {/* Step 2 — Enter code */}
+              {/* Step 2 */}
               {!emailExists && regStep === 2 && (
                 <form onSubmit={handleRegVerify}>
                   <div style={{
