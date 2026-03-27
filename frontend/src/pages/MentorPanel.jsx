@@ -5,47 +5,38 @@ import API from '../utils/api';
 
 // ✅ TUZATILDI: API key env o'zgaruvchisidan o'qiladi
 // frontend/.env ga qo'shing: REACT_APP_GEMINI_KEY=sizning_keyingiz
-const GEMINI_KEY = process.env.REACT_APP_GEMINI_KEY || '';
+const GROQ_KEY = process.env.REACT_APP_GROQ_KEY || '';
 
-// ✅ TUZATILDI: model nomi to'g'irlandi (gemini-2.0-flash → gemini-1.5-flash)
-// va xatolik tekshiruvi qo'shildi
 const geminiCheck = async (assignmentTitle, content) => {
-  if (!GEMINI_KEY) {
-    throw new Error('Gemini API key sozlanmagan. Frontend .env faylga REACT_APP_GEMINI_KEY qo\'shing.');
+  if (!GROQ_KEY) {
+    throw new Error('Groq API key sozlanmagan. Frontend .env faylga REACT_APP_GROQ_KEY qo\'shing.');
   }
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Sen dasturlash o'qituvchisisisan. Quyidagi vazifani tekshir va 0-100 ball baho ber.\n\nVazifa: ${assignmentTitle}\nO'quvchi javobi:\n${content}\n\nQuyidagi formatda javob ber (boshqa hech narsa yozma):\n**Baho: [0-100]**\n**Xatolar:** [xatolar yoki "Xato yo'q"]\n**Yaxshi tomonlari:** [nima yaxshi]\n**Maslahat:** [qo'shimcha maslahat]`
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1024,
-        }
-      })
-    }
-  );
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROQ_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{
+        role: 'user',
+        content: `Sen dasturlash o'qituvchisisisan. Quyidagi vazifani tekshir va 0-100 ball baho ber.\n\nVazifa: ${assignmentTitle}\nO'quvchi javobi:\n${content}\n\nQuyidagi formatda javob ber (boshqa hech narsa yozma):\n**Baho: [0-100]**\n**Xatolar:** [xatolar yoki "Xato yo'q"]\n**Yaxshi tomonlari:** [nima yaxshi]\n**Maslahat:** [qo'shimcha maslahat]`
+      }],
+      temperature: 0.3,
+      max_tokens: 1024,
+    })
+  });
 
   const data = await res.json();
 
-  // ✅ TUZATILDI: API xatoliklarini aniq ko'rsatish
   if (data.error) {
-    console.error('Gemini API xatolik:', data.error);
-    throw new Error(`Gemini xatolik: ${data.error.message || data.error.status}`);
+    console.error('Groq API xatolik:', data.error);
+    throw new Error(`Groq xatolik: ${data.error.message || data.error.type}`);
   }
 
-  if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('Gemini javob bermadi. Keyinroq urinib ko\'ring.');
-  }
-
-  return data.candidates[0]?.content?.parts?.[0]?.text || 'AI javob bera olmadi';
+  return data.choices?.[0]?.message?.content || 'AI javob bera olmadi';
 };
 
 const Sidebar = ({ active, setActive, logout, mentor }) => {
