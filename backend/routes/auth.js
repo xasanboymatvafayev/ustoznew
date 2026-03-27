@@ -36,13 +36,13 @@ const genCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 // REGISTER - Step 1: send verification code
 router.post('/register/send-code', async (req, res) => {
-  const { login, full_name, phone, email, group_name } = req.body;
+  const { login, full_name, phone, email, group_name, password } = req.body;
   const db = req.app.get('db');
   
   try {
-    // Check if email already exists
-    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existing.rows.length > 0) {
+    // Check if email already exists and verified
+    const existing = await db.query('SELECT id, is_verified FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0 && existing.rows[0].is_verified) {
       return res.status(409).json({ 
         error: 'Bu email bilan avval ro\'yxatdan o\'tilgan',
         exists: true 
@@ -58,12 +58,16 @@ router.post('/register/send-code', async (req, res) => {
     const code = genCode();
     const expires = new Date(Date.now() + 10 * 60 * 1000);
     
-    // Store temp data in a pending table (use users with is_verified=false)
+    // Hash password now so verify step doesn't need it again
+    const hash = password ? await bcrypt.hash(password, 10) : 'PENDING';
+
     await db.query(`
       INSERT INTO users (login, full_name, phone, email, group_name, password_hash, verification_code, verification_expires)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (email) DO UPDATE SET verification_code=$7, verification_expires=$8
-    `, [login, full_name, phone, email, group_name, 'PENDING', code, expires]);
+      ON CONFLICT (email) DO UPDATE SET 
+        login=$1, full_name=$2, phone=$3, group_name=$5,
+        password_hash=$6, verification_code=$7, verification_expires=$8, is_verified=false
+    `, [login, full_name, phone, email, group_name, hash, code, expires]);
 
     await sendCode(email, code);
     res.json({ message: 'Tasdiqlash kodi yuborildi', email });
@@ -73,7 +77,7 @@ router.post('/register/send-code', async (req, res) => {
   }
 });
 
-// REGISTER - Step 2: verify code and set password
+// REGISTER - Step 2: verify code (password already saved in step 1)
 router.post('/register/verify', async (req, res) => {
   const { email, code, password } = req.body;
   const db = req.app.get('db');
@@ -88,12 +92,17 @@ router.post('/register/verify', async (req, res) => {
       return res.status(400).json({ error: 'Kod noto\'g\'ri yoki muddati o\'tgan' });
     }
 
-    const hash = await bcrypt.hash(password, 10);
     const u = user.rows[0];
 
+    // If password provided (re-register case), update hash
+    if (password && u.password_hash === 'PENDING') {
+      const hash = await bcrypt.hash(password, 10);
+      await db.query('UPDATE users SET password_hash=$1 WHERE email=$2', [hash, email]);
+    }
+
     await db.query(
-      'UPDATE users SET password_hash=$1, is_verified=true, verification_code=null WHERE email=$2',
-      [hash, email]
+      'UPDATE users SET is_verified=true, verification_code=null WHERE email=$1',
+      [email]
     );
 
     // Add to group
