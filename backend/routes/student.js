@@ -134,4 +134,21 @@ router.get('/calendar', async (req, res) => {
   }
 });
 
+// Get student's own attendance
+router.get('/attendance', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const result = await db.query(
+      `SELECT a.lesson_date, a.status, g.id as group_id, g.name as group_name
+       FROM attendance a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.user_id=$1 ORDER BY a.lesson_date`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
