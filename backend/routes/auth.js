@@ -5,19 +5,33 @@ const nodemailer = require('nodemailer');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ustoz_yordamchi_secret_2024';
 
-// Create transporter once (reuse connection)
+// ✅ TUZATILDI: service:'gmail' o'rniga host/port aniq ko'rsatildi
+// Railway.app da smtp.gmail.com port 587 ishlaydi
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // true faqat 465 port uchun
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
-  pool: true, // use connection pool for speed
+  tls: {
+    rejectUnauthorized: false // Railway SSL muammosini hal qiladi
+  },
+  pool: true,
   maxConnections: 5,
 });
 
+// Email yuborishdan oldin ulanishni tekshirish
+transporter.verify((error) => {
+  if (error) {
+    console.error('❌ Email transporter xatolik:', error.message);
+  } else {
+    console.log('✅ Email server tayyor!');
+  }
+});
+
 const sendCode = (email, code) => {
-  // Fire and forget - don't await, return immediately
   transporter.sendMail({
     from: `"Ustoz Yordamchi AI" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -30,24 +44,26 @@ const sendCode = (email, code) => {
       </div>
       <p style="color:#64748b;font-size:13px">Kod 10 daqiqa davomida amal qiladi.</p>
     </div>`
-  }).catch(e => console.error('Email error:', e.message));
+  }).then(() => {
+    console.log(`✅ Email yuborildi: ${email}`);
+  }).catch(e => {
+    console.error(`❌ Email xatolik (${email}):`, e.message);
+  });
 };
 
 const genCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// REGISTER - Step 1: validate, save, send code (fast response)
+// REGISTER - Step 1: validate, save, send code
 router.post('/register/send-code', async (req, res) => {
   const { login, full_name, phone, email, group_name, password } = req.body;
   const db = req.app.get('db');
 
   try {
-    // Check if email already exists and verified
     const existing = await db.query('SELECT id, is_verified FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0 && existing.rows[0].is_verified) {
       return res.status(409).json({ error: 'Bu email bilan avval ro\'yxatdan o\'tilgan', exists: true });
     }
 
-    // Check group exists
     const groupExists = await db.query('SELECT name FROM groups WHERE name = $1', [group_name]);
     if (!groupExists.rows.length) {
       return res.status(400).json({ error: 'Bu guruh topilmadi' });
@@ -55,7 +71,7 @@ router.post('/register/send-code', async (req, res) => {
 
     const code = genCode();
     const expires = new Date(Date.now() + 10 * 60 * 1000);
-    const hash = await bcrypt.hash(password, 8); // rounds=8 for speed
+    const hash = await bcrypt.hash(password, 8);
 
     await db.query(`
       INSERT INTO users (login, full_name, phone, email, group_name, password_hash, verification_code, verification_expires)
@@ -65,7 +81,6 @@ router.post('/register/send-code', async (req, res) => {
         password_hash=$6, verification_code=$7, verification_expires=$8, is_verified=false
     `, [login, full_name, phone, email, group_name, hash, code, expires]);
 
-    // Send email async (don't block response)
     sendCode(email, code);
 
     res.json({ message: 'Tasdiqlash kodi yuborildi', email });
@@ -92,7 +107,6 @@ router.post('/register/verify', async (req, res) => {
     const u = result.rows[0];
     await db.query('UPDATE users SET is_verified=true, verification_code=null WHERE email=$1', [email]);
 
-    // Add to group
     const group = await db.query('SELECT id FROM groups WHERE name=$1', [u.group_name]);
     if (group.rows.length) {
       await db.query(
@@ -108,7 +122,7 @@ router.post('/register/verify', async (req, res) => {
   }
 });
 
-// Re-verify (delete old account, send new code)
+// Re-verify
 router.post('/register/re-verify', async (req, res) => {
   const { email } = req.body;
   const db = req.app.get('db');
@@ -206,7 +220,6 @@ router.post('/forgot-password/verify', async (req, res) => {
     const hash = await bcrypt.hash(newPassword, 8);
     await db.query('UPDATE users SET password_hash=$1, verification_code=null WHERE email=$2', [hash, email]);
 
-    // Send new credentials
     transporter.sendMail({
       from: `"Ustoz Yordamchi AI" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -220,7 +233,7 @@ router.post('/forgot-password/verify', async (req, res) => {
         </div>
         <p style="color:#64748b;font-size:13px">Tizimga kirgach parolni o'zgartiring!</p>
       </div>`
-    }).catch(e => console.error('Email error:', e.message));
+    }).catch(e => console.error('Email xatolik:', e.message));
 
     res.json({ message: 'Yangi login va parol emailga yuborildi' });
   } catch (e) {
