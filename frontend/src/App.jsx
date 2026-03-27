@@ -9,8 +9,8 @@ import './styles/global.css';
 
 const ProtectedRoute = ({ children, role }) => {
   const { user, token } = useAuth();
-  if (!token) return <Navigate to="/login" />;
-  if (role && user?.role !== role) return <Navigate to="/login" />;
+  if (!token) return <Navigate to="/login" replace />;
+  if (role && user?.role !== role) return <Navigate to="/login" replace />;
   return children;
 };
 
