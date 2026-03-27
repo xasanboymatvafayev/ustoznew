@@ -164,22 +164,15 @@ router.put('/submissions/:id/grade', async (req, res) => {
     const assignment = await db.query('SELECT * FROM assignments WHERE id=$1', [s.assignment_id]);
     const a = assignment.rows[0];
     
-    // Check if score already exists for this submission
-    const existing = await db.query(
-      'SELECT id FROM scores WHERE user_id=$1 AND assignment_id=$2',
-      [s.user_id, s.assignment_id]
+    // Upsert score — ON CONFLICT by user_id+group_id+lesson_date
+    const lessonDate = a.lesson_date || a.due_date;
+    await db.query(
+      `INSERT INTO scores (user_id, group_id, assignment_id, score, lesson_date)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (user_id, group_id, lesson_date)
+       DO UPDATE SET score=$4, assignment_id=$3, updated_at=NOW()`,
+      [s.user_id, a.group_id, s.assignment_id, score, lessonDate]
     );
-    if (existing.rows.length > 0) {
-      await db.query(
-        'UPDATE scores SET score=$1, updated_at=NOW() WHERE user_id=$2 AND assignment_id=$3',
-        [score, s.user_id, s.assignment_id]
-      );
-    } else {
-      await db.query(
-        'INSERT INTO scores (user_id, group_id, assignment_id, score, lesson_date) VALUES ($1,$2,$3,$4,$5)',
-        [s.user_id, a.group_id, s.assignment_id, score, a.lesson_date || a.due_date]
-      );
-    }
     
     res.json(sub.rows[0]);
   } catch (e) {
