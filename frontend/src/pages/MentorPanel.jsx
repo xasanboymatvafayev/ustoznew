@@ -12,23 +12,26 @@ const geminiCheck = async (assignmentTitle, studentAnswer) => {
     throw new Error('Groq API key sozlanmagan. Frontend .env faylga REACT_APP_GROQ_KEY qo\'shing.');
   }
 
-  const prompt = `You are a strict but fair teacher grading a student's answer.
+  const prompt = `You are a teacher. Grade the student answer for the given task.
 
-TASK: "${assignmentTitle}"
-STUDENT ANSWER: "${studentAnswer}"
+Task given to student: "${assignmentTitle}"
+Student's answer: "${studentAnswer}"
 
-GRADING RULES:
-- Score is out of 10 (not 100)
-- If the student's answer is CORRECT for the given task, give 9-10 points
-- If partially correct, give 5-8 points
-- If wrong or empty, give 0-4 points
-- Be generous if the answer matches the task
+IMPORTANT: The student answer above is their FULL response. Judge it fairly.
+Example: if task is "5+5=?" and student answered "10", that is CORRECT, give 10/10.
+Example: if task is "Write hello world in Python" and student wrote correct code, give 9-10/10.
 
-Respond ONLY in this exact format (write in Uzbek language):
-**Baho: [number 0-10]**
-**Xatolar:** [xatolar yoki "Xato yo'q"]
-**Yaxshi tomonlari:** [nima yaxshi]
-**Maslahat:** [qo'shimcha maslahat]`;
+Scoring (out of 10):
+- Fully correct: 9-10
+- Mostly correct: 6-8  
+- Partially correct: 3-5
+- Wrong or missing: 0-2
+
+Reply ONLY in this format (use Uzbek language):
+**Baho: [0-10]**
+**Xatolar:** [errors or "Xato yo'q"]
+**Yaxshi tomonlari:** [what was good]
+**Maslahat:** [advice]`;
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -330,7 +333,7 @@ function HomeworkView({ group }) {
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm"
                       style={{ background: 'rgba(91,141,238,0.15)', color: 'var(--accent)', border: '1px solid rgba(91,141,238,0.3)' }}
-                      onClick={() => handleAiCheck(s, a.title)}
+                      onClick={() => handleAiCheck(s, a.title + (a.description ? ': ' + a.description : ''))}
                       disabled={aiLoading[s.id]}>
                       {aiLoading[s.id] ? '⏳ AI tekshirmoqda...' : '🤖 AI tekshirish'}
                     </button>
@@ -534,7 +537,7 @@ function ClassworkView({ group }) {
                   )}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm" style={{ background: 'rgba(91,141,238,0.15)', color: 'var(--accent)', border: '1px solid rgba(91,141,238,0.3)' }}
-                      onClick={() => handleAiCheck(s, a.title)} disabled={aiLoading[s.id]}>
+                      onClick={() => handleAiCheck(s, a.title + (a.description ? ': ' + a.description : ''))} disabled={aiLoading[s.id]}>
                       {aiLoading[s.id] ? '⏳ AI...' : '🤖 AI tekshirish'}
                     </button>
                     <button className="btn btn-sm" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--success)', border: '1px solid rgba(16,185,129,0.3)' }}
