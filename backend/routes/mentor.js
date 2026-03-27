@@ -209,4 +209,77 @@ router.put('/groups/:id/schedule/edit', async (req, res) => {
   }
 });
 
+// ── DAVOMAT (Attendance) ──
+
+// Get attendance for a group on a specific date
+router.get('/groups/:id/attendance', async (req, res) => {
+  const db = req.app.get('db');
+  const { date } = req.query;
+  try {
+    const members = await db.query(
+      `SELECT u.id, u.full_name FROM group_members gm JOIN users u ON gm.user_id=u.id WHERE gm.group_id=$1 ORDER BY u.full_name`,
+      [req.params.id]
+    );
+    let attendance = [];
+    if (date) {
+      const att = await db.query(
+        `SELECT * FROM attendance WHERE group_id=$1 AND lesson_date=$2`,
+        [req.params.id, date]
+      );
+      attendance = att.rows;
+    }
+    res.json({ members: members.rows, attendance });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Save attendance for a group on a date
+router.post('/groups/:id/attendance', async (req, res) => {
+  const db = req.app.get('db');
+  const { date, records } = req.body; // records: [{user_id, status}]
+  try {
+    for (const rec of records) {
+      await db.query(
+        `INSERT INTO attendance (group_id, user_id, lesson_date, status, marked_by)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (group_id, user_id, lesson_date) DO UPDATE SET status=$4, marked_by=$5`,
+        [req.params.id, rec.user_id, date, rec.status, req.user.id]
+      );
+    }
+    res.json({ message: 'Davomat saqlandi' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get attendance history for a group (all dates)
+router.get('/groups/:id/attendance/history', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const att = await db.query(
+      `SELECT a.*, u.full_name FROM attendance a JOIN users u ON a.user_id=u.id WHERE a.group_id=$1 ORDER BY a.lesson_date DESC`,
+      [req.params.id]
+    );
+    res.json(att.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Student: get own attendance for their group
+router.get('/groups/:id/attendance/mine', async (req, res) => {
+  // This will be called from student routes
+  const db = req.app.get('db');
+  try {
+    const att = await db.query(
+      `SELECT lesson_date, status FROM attendance WHERE group_id=$1 AND user_id=$2 ORDER BY lesson_date`,
+      [req.params.id, req.query.user_id]
+    );
+    res.json(att.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
