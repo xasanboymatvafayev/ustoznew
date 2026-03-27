@@ -4,65 +4,14 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ustoz_yordamchi_secret_2024';
 
-// ✅ RESEND API — Railway SMTP blokini chetlab o'tadi (HTTP request)
-// nodemailer o'chirildi, chunki Railway barcha SMTP portlarni bloklaydi
-const sendEmail = async (to, subject, html) => {
-  const RESEND_API_KEY = process.env.RESEND_API_KEY;
-
-  if (!RESEND_API_KEY) {
-    console.error('❌ RESEND_API_KEY env da sozlanmagan!');
-    return false;
-  }
-
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: 'Ustoz Yordamchi AI <onboarding@resend.dev>',
-        to: [to],
-        subject,
-        html
-      })
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error(`❌ Resend xatolik (${to}):`, JSON.stringify(data));
-      return false;
-    }
-
-    console.log(`✅ Email yuborildi: ${to} | id: ${data.id}`);
-    return true;
-  } catch (e) {
-    console.error(`❌ Email fetch xatolik (${to}):`, e.message);
-    return false;
-  }
-};
-
-const sendCode = (email, code) => {
-  const subject = 'Tasdiqlash kodi — Ustoz Yordamchi AI';
-  const html = `
-    <div style="font-family:Arial;padding:30px;background:#0a0e1a;color:#e8edf8;border-radius:12px;max-width:400px">
-      <h2 style="color:#5b8dee;margin-bottom:8px">🤖 Ustoz Yordamchi AI</h2>
-      <p style="color:#94a3b8;margin-bottom:24px">Sizning tasdiqlash kodingiz:</p>
-      <div style="background:#141d35;border:2px solid #5b8dee;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
-        <span style="font-size:42px;font-weight:900;letter-spacing:12px;color:#5b8dee">${code}</span>
-      </div>
-      <p style="color:#64748b;font-size:13px">Kod 10 daqiqa davomida amal qiladi.</p>
-    </div>
-  `;
-  sendEmail(email, subject, html).catch(e => console.error('sendCode xatolik:', e.message));
-};
+// ✅ Email yuborish FRONTEND (EmailJS) ga o'tkazildi
+// Backend faqat: kod generatsiya qiladi, DB ga saqlaydi, frontendga qaytaradi
+// Frontend EmailJS orqali kodni emailga yuboradi
 
 const genCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 // ─────────────────────────────────────────────
-// REGISTER — Step 1: validate, save, send code
+// REGISTER — Step 1: validate, save, return code
 // ─────────────────────────────────────────────
 router.post('/register/send-code', async (req, res) => {
   const { login, full_name, phone, email, group_name, password } = req.body;
@@ -91,9 +40,8 @@ router.post('/register/send-code', async (req, res) => {
         password_hash=$6, verification_code=$7, verification_expires=$8, is_verified=false
     `, [login, full_name, phone, email, group_name, hash, code, expires]);
 
-    sendCode(email, code);
-
-    res.json({ message: 'Tasdiqlash kodi yuborildi', email });
+    // ✅ Kodni frontendga qaytaramiz — frontend EmailJS orqali yuboradi
+    res.json({ message: 'Kod tayyor', email, code });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e.message });
@@ -135,7 +83,7 @@ router.post('/register/verify', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// Re-verify
+// Re-verify — yangi kod yuborish
 // ─────────────────────────────────────────────
 router.post('/register/re-verify', async (req, res) => {
   const { email } = req.body;
@@ -147,8 +95,8 @@ router.post('/register/re-verify', async (req, res) => {
       'UPDATE users SET verification_code=$1, verification_expires=$2, is_verified=false WHERE email=$3',
       [code, expires, email]
     );
-    sendCode(email, code);
-    res.json({ message: 'Yangi kod yuborildi' });
+    // ✅ Kodni frontendga qaytaramiz
+    res.json({ message: 'Yangi kod tayyor', code });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -219,15 +167,16 @@ router.post('/forgot-password', async (req, res) => {
     const code = genCode();
     const expires = new Date(Date.now() + 10 * 60 * 1000);
     await db.query('UPDATE users SET verification_code=$1, verification_expires=$2 WHERE email=$3', [code, expires, email]);
-    sendCode(email, code);
-    res.json({ message: 'Tasdiqlash kodi yuborildi' });
+
+    // ✅ Kodni frontendga qaytaramiz
+    res.json({ message: 'Kod tayyor', code });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 // ─────────────────────────────────────────────
-// FORGOT PASSWORD — verify & send new password
+// FORGOT PASSWORD — verify & get new password
 // ─────────────────────────────────────────────
 router.post('/forgot-password/verify', async (req, res) => {
   const { email, code } = req.body;
@@ -244,20 +193,12 @@ router.post('/forgot-password/verify', async (req, res) => {
     const hash = await bcrypt.hash(newPassword, 8);
     await db.query('UPDATE users SET password_hash=$1, verification_code=null WHERE email=$2', [hash, email]);
 
-    const html = `
-      <div style="font-family:Arial;padding:30px;background:#0a0e1a;color:#e8edf8;border-radius:12px;max-width:400px">
-        <h2 style="color:#5b8dee">🤖 Ustoz Yordamchi AI</h2>
-        <p style="color:#94a3b8">Sizning yangi kirish ma'lumotlaringiz:</p>
-        <div style="background:#141d35;border-radius:10px;padding:16px;margin:16px 0">
-          <p><b style="color:#94a3b8">Login:</b> <span style="color:#5b8dee">${user.login}</span></p>
-          <p><b style="color:#94a3b8">Parol:</b> <span style="color:#5b8dee">${newPassword}</span></p>
-        </div>
-        <p style="color:#64748b;font-size:13px">Tizimga kirgach parolni o'zgartiring!</p>
-      </div>
-    `;
-    sendEmail(email, 'Yangi parolingiz — Ustoz Yordamchi AI', html);
-
-    res.json({ message: 'Yangi login va parol emailga yuborildi' });
+    // ✅ Yangi parolni frontendga qaytaramiz — frontend EmailJS orqali yuboradi
+    res.json({
+      message: 'Yangi parol tayyor',
+      login: user.login,
+      newPassword
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
