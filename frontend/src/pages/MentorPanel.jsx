@@ -1100,7 +1100,8 @@ function MentorProfile() {
     if (form.new_password !== form.confirm) { setError('Parollar mos kelmadi'); return setLoading(false); }
     try {
       await API.put('/mentor/profile/password', { old_password: form.old_password, new_password: form.new_password });
-      setMsg('Parol o'zgartirildi! ✅');
+      const successMsg = "Parol ozgartirildi! ✅";
+      setMsg(successMsg);
       setForm({ old_password: '', new_password: '', confirm: '' });
     } catch (e) { setError(e.response?.data?.error || 'Xatolik'); }
     setLoading(false);
