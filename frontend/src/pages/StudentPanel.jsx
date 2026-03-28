@@ -307,8 +307,11 @@ function StudentHomework() {
     setSubmitting(false);
   };
 
-  const now = new Date();
-  const isExpired = (a) => a.due_date && new Date(`${a.due_date}T${a.due_time || '23:59:59'}`) < now;
+  const isExpired = (a) => {
+    if (!a.due_date) return false;
+    const deadline = new Date(`${a.due_date}T${a.due_time || '23:59:59'}`);
+    return new Date() > deadline;
+  };
 
   const counts = {
     all: assignments.length,
@@ -712,7 +715,7 @@ function StudentProfile() {
     if (form.new_password !== form.confirm) { setError('Parollar mos kelmadi'); return setLoading(false); }
     try {
       await API.put('/student/change-password', { old_password: form.old_password, new_password: form.new_password });
-      setMsg('Parol o\'zgartirildi! ✅');
+      setMsg("Parol o'zgartirildi! ✅");
       setForm({ old_password: '', new_password: '', confirm: '' });
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 3000);
