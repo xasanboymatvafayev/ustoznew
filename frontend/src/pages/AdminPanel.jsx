@@ -321,8 +321,8 @@ function AdminGroups({ groups, mentors, reload }) {
               <div className="form-group">
                 <label>Dars kunlari</label>
                 <select className="input" value={form.lesson_days} onChange={e => setForm({ ...form, lesson_days: e.target.value })}>
-                  <option value="juft">Juft kunlar (Du, Chor, Jum)</option>
-                  <option value="toq">Toq kunlar (Se, Pay, Shan)</option>
+                  <option value="juft">Juft kunlar (Se, Pay, Sha)</option>
+                  <option value="toq">Toq kunlar (Du, Chor, Ju)</option>
                   <option value="harkuni">Har kuni</option>
                 </select>
               </div>
