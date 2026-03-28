@@ -62,6 +62,7 @@ const Sidebar = ({ active, setActive, logout, mentor }) => {
     { id: 'dashboard', icon: '📊', label: 'Dashboard' },
     { id: 'groups', icon: '🏫', label: 'Guruhlar' },
     { id: 'students', icon: '🎓', label: 'O\'quvchilar' },
+    { id: 'profile', icon: '👤', label: 'Profil' },
   ];
   return (
     <div className="sidebar">
@@ -118,6 +119,7 @@ export default function MentorPanel() {
           <GroupDetail group={selectedGroup} view={groupView} setView={setGroupView} onBack={() => setSelectedGroup(null)} />
         )}
         {active === 'students' && <MentorStudents groups={data?.groups || []} />}
+        {active === 'profile' && <MentorProfile />}
       </main>
     </div>
   );
@@ -438,17 +440,21 @@ function ClassworkView({ group }) {
     const t = {};
     const now = Date.now();
     cw.forEach(a => {
-      if (a.is_open && a.duration_minutes && a.created_at) {
-        // Server vaqtidan hisoblash — kim kirganda ham bir xil bo'ladi
-        const startedAt = new Date(a.created_at).getTime();
+      if (a.is_open && a.duration_minutes && a.started_at) {
+        // started_at dan hisoblash — mentor "Boshlash" bosganda boshlanadi
+        const startedAt = new Date(a.started_at).getTime();
         const totalSec = a.duration_minutes * 60;
         const elapsed = Math.floor((now - startedAt) / 1000);
         const remaining = totalSec - elapsed;
-        if (remaining > 0) t[a.id] = remaining;
-        else t[a.id] = 0;
+        t[a.id] = remaining > 0 ? remaining : 0;
       }
     });
     setTimers(t);
+  };
+
+  const handleStart = async (aId) => {
+    await API.post(`/mentor/assignments/${aId}/start`);
+    load();
   };
 
   const handleAdd = async (e) => {
@@ -507,11 +513,21 @@ function ClassworkView({ group }) {
                 {!a.is_open && <span className="tag tag-red">Yopilgan</span>}
               </div>
             </div>
-            {a.is_open && timers[a.id] !== undefined && (
-              <div style={{ fontSize: '28px', fontFamily: 'var(--font2)', fontWeight: '700', color: timers[a.id] < 60 ? 'var(--danger)' : 'var(--accent)', marginLeft: '16px' }}>
-                ⏱️ {fmt(timers[a.id] || 0)}
-              </div>
-            )}
+            <div style={{ textAlign: 'right', marginLeft: '16px' }}>
+              {a.is_open && !a.started_at && (
+                <button className="btn btn-success btn-sm" onClick={() => handleStart(a.id)}>
+                  ▶️ Boshlash
+                </button>
+              )}
+              {a.is_open && a.started_at && timers[a.id] !== undefined && (
+                <div style={{ fontSize: '28px', fontFamily: 'var(--font2)', fontWeight: '700', color: timers[a.id] < 60 ? 'var(--danger)' : 'var(--accent)' }}>
+                  ⏱️ {fmt(timers[a.id] || 0)}
+                </div>
+              )}
+              {a.is_open && a.started_at && timers[a.id] === 0 && (
+                <span className="tag tag-red">Vaqt tugadi</span>
+              )}
+            </div>
           </div>
           <button className="btn btn-secondary btn-sm" style={{ marginTop: '12px' }}
             onClick={() => showSubs === a.id ? setShowSubs(null) : loadSubs(a.id)}>
@@ -1062,6 +1078,102 @@ function AttendanceView({ group }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ── MENTOR PROFILE ──
+function MentorProfile() {
+  const { user } = useAuth();
+  const [form, setForm] = useState({ old_password: '', new_password: '', confirm: '' });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+  const [avatar, setAvatar] = useState(user?.avatar_url || '');
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  const AVATARS = ['👨‍💻','👩‍💻','🧑‍🏫','👨‍🏫','👩‍🏫','🦸','🧙','🎓','🤖','🦊','🐼','🦁','🐯','🦋','🌟','🔥','💎','🚀'];
+
+  const handlePassword = async (e) => {
+    e.preventDefault(); setLoading(true); setMsg(''); setError('');
+    if (form.new_password !== form.confirm) { setError('Parollar mos kelmadi'); return setLoading(false); }
+    try {
+      await API.put('/mentor/profile/password', { old_password: form.old_password, new_password: form.new_password });
+      setMsg('Parol o'zgartirildi! ✅');
+      setForm({ old_password: '', new_password: '', confirm: '' });
+    } catch (e) { setError(e.response?.data?.error || 'Xatolik'); }
+    setLoading(false);
+  };
+
+  const handleAvatar = async (av) => {
+    setAvatarLoading(true);
+    setAvatar(av);
+    try { await API.put('/mentor/profile/avatar', { avatar_url: av }); } catch {}
+    setAvatarLoading(false);
+  };
+
+  return (
+    <div className="fade-in">
+      <div className="page-header"><h2>👤 Mening profilim</h2></div>
+      <div className="grid-2" style={{ gap: '20px' }}>
+
+        {/* Avatar */}
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '80px', marginBottom: '12px', lineHeight: 1, animation: 'pulse 2s infinite' }}>
+            {avatar || '👨‍🏫'}
+          </div>
+          <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '4px' }}>{user?.full_name}</h3>
+          <p style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '16px' }}>Mentor</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+            {AVATARS.map(av => (
+              <button key={av} onClick={() => handleAvatar(av)}
+                style={{
+                  fontSize: '24px', background: avatar === av ? 'var(--accent)' : 'var(--bg2)',
+                  border: avatar === av ? '2px solid var(--accent)' : '2px solid var(--border)',
+                  borderRadius: '10px', padding: '6px', cursor: 'pointer', transition: 'all 0.2s',
+                  transform: avatar === av ? 'scale(1.2)' : 'scale(1)'
+                }}>{av}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Info + Password */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="card">
+            <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>Ma'lumotlar</h3>
+            {[
+              { label: 'Ism Familya', value: user?.full_name, icon: '👤' },
+              { label: 'Telefon', value: user?.phone, icon: '📱' },
+            ].map((item, i) => (
+              <div key={i} style={{ padding: '12px', background: 'var(--bg2)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '10px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>{item.icon} {item.label}</div>
+                <div style={{ fontWeight: '600' }}>{item.value || '—'}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card">
+            <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>🔒 Parol o'zgartirish</h3>
+            {msg && <div className="alert alert-success">{msg}</div>}
+            {error && <div className="alert alert-error">{error}</div>}
+            <form onSubmit={handlePassword}>
+              <div className="form-group"><label>Eski parol</label>
+                <input className="input" type="password" value={form.old_password} onChange={e => setForm({ ...form, old_password: e.target.value })} required />
+              </div>
+              <div className="form-group"><label>Yangi parol</label>
+                <input className="input" type="password" value={form.new_password} onChange={e => setForm({ ...form, new_password: e.target.value })} required />
+              </div>
+              <div className="form-group"><label>Tasdiqlang</label>
+                <input className="input" type="password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} required />
+              </div>
+              <button className="btn btn-primary" type="submit" style={{ width: '100%' }} disabled={loading}>
+                {loading ? '...' : '💾 Saqlash'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
