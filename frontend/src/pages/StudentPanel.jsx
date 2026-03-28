@@ -702,6 +702,10 @@ function StudentProfile() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [avatar, setAvatar] = useState(user?.avatar_url || '');
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  const AVATARS = ['🎓','👨‍💻','👩‍💻','🦸','🧑‍🎨','🧙','🦊','🐼','🦁','🐯','🦋','🌟','🔥','💎','🚀','🎮','🎯','🏆'];
 
   const handleChange = async (e) => {
     e.preventDefault(); setLoading(true); setMsg(''); setError('');
@@ -710,29 +714,86 @@ function StudentProfile() {
       await API.put('/student/change-password', { old_password: form.old_password, new_password: form.new_password });
       setMsg('Parol o\'zgartirildi! ✅');
       setForm({ old_password: '', new_password: '', confirm: '' });
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
     } catch (e) { setError(e.response?.data?.error || 'Xatolik'); }
     setLoading(false);
   };
 
+  const handleAvatar = async (av) => {
+    setAvatar(av);
+    try { await API.put('/student/profile/avatar', { avatar_url: av }); } catch {}
+  };
+
   return (
-    <div className="fade-in">
-      <div className="page-header"><h2>👤 Profil</h2></div>
+    <div className="fade-in" style={{ position: 'relative' }}>
+      {/* Confetti */}
+      {showConfetti && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999, overflow: 'hidden' }}>
+          {[...Array(30)].map((_, i) => (
+            <div key={i} style={{
+              position: 'absolute',
+              left: `${Math.random() * 100}%`,
+              top: '-20px',
+              fontSize: '20px',
+              animation: `fall ${1 + Math.random() * 2}s linear ${Math.random()}s forwards`,
+            }}>
+              {['🎉','⭐','🌟','✨','🎊','💫'][Math.floor(Math.random() * 6)]}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes glow { 0%,100%{box-shadow:0 0 10px var(--accent)} 50%{box-shadow:0 0 30px var(--accent), 0 0 60px var(--accent)} }
+      `}</style>
+
+      <div className="page-header"><h2>👤 Mening profilim</h2></div>
+
+      {/* Avatar card */}
+      <div className="card" style={{ textAlign: 'center', marginBottom: '20px', background: 'linear-gradient(135deg, var(--bg2) 0%, var(--card) 100%)' }}>
+        <div style={{ fontSize: '90px', lineHeight: 1, marginBottom: '12px', animation: 'float 3s ease-in-out infinite', display: 'inline-block' }}>
+          {avatar || '🎓'}
+        </div>
+        <h2 style={{ fontFamily: 'var(--font2)', marginBottom: '4px' }}>{user?.full_name}</h2>
+        <p style={{ color: 'var(--text3)', fontSize: '13px', marginBottom: '20px' }}>O'quvchi 🎓</p>
+
+        <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '12px' }}>Avatar tanlang:</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+          {AVATARS.map(av => (
+            <button key={av} onClick={() => handleAvatar(av)}
+              style={{
+                fontSize: '28px', background: avatar === av ? 'rgba(91,141,238,0.2)' : 'var(--bg2)',
+                border: avatar === av ? '2px solid var(--accent)' : '2px solid var(--border)',
+                borderRadius: '12px', padding: '8px', cursor: 'pointer', transition: 'all 0.2s',
+                transform: avatar === av ? 'scale(1.25)' : 'scale(1)',
+                animation: avatar === av ? 'glow 2s infinite' : 'none',
+              }}>{av}</button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid-2" style={{ gap: '20px' }}>
         <div className="card">
-          <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>Ma'lumotlar</h3>
+          <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>📋 Ma'lumotlar</h3>
           {[
             { label: 'Ism Familya', value: user?.full_name, icon: '👤' },
             { label: 'Email', value: user?.email, icon: '📧' },
           ].map((item, i) => (
-            <div key={i} style={{ padding: '12px', background: 'var(--bg2)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '10px' }}>
+            <div key={i} style={{ padding: '12px', background: 'var(--bg2)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '10px', transition: 'all 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>{item.icon} {item.label}</div>
               <div style={{ fontWeight: '600' }}>{item.value || '—'}</div>
             </div>
           ))}
         </div>
+
         <div className="card">
           <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>🔒 Parol o'zgartirish</h3>
-          {msg && <div className="alert alert-success">{msg}</div>}
+          {msg && <div className="alert alert-success" style={{ animation: 'fadeIn 0.3s' }}>{msg}</div>}
           {error && <div className="alert alert-error">{error}</div>}
           <form onSubmit={handleChange}>
             <div className="form-group"><label>Eski parol</label>
@@ -745,7 +806,7 @@ function StudentProfile() {
               <input className="input" type="password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} required />
             </div>
             <button className="btn btn-primary" type="submit" style={{ width: '100%' }} disabled={loading}>
-              {loading ? '...' : '💾 Saqlash'}
+              {loading ? '⏳ Saqlanmoqda...' : '💾 Saqlash'}
             </button>
           </form>
         </div>
