@@ -285,4 +285,58 @@ router.get('/groups/:id/attendance/mine', async (req, res) => {
   }
 });
 
+
+// Start classwork timer
+router.post('/assignments/:id/start', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const result = await db.query(
+      'UPDATE assignments SET started_at=NOW() WHERE id=$1 AND mentor_id=$2 RETURNING *',
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Topilmadi' });
+    
+    // Auto-close after duration
+    const a = result.rows[0];
+    if (a.duration_minutes) {
+      setTimeout(async () => {
+        await db.query('UPDATE assignments SET is_open=false WHERE id=$1', [a.id]);
+      }, a.duration_minutes * 60 * 1000);
+    }
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Mentor profile - change password
+router.put('/profile/password', async (req, res) => {
+  const db = req.app.get('db');
+  const { old_password, new_password } = req.body;
+  const bcrypt = require('bcryptjs');
+  try {
+    const mentor = await db.query('SELECT * FROM mentors WHERE id=$1', [req.user.id]);
+    if (!mentor.rows[0]) return res.status(404).json({ error: 'Topilmadi' });
+    const ok = await bcrypt.compare(old_password, mentor.rows[0].password_hash);
+    if (!ok) return res.status(400).json({ error: 'Eski parol noto'g'ri' });
+    const hash = await bcrypt.hash(new_password, 10);
+    await db.query('UPDATE mentors SET password_hash=$1 WHERE id=$2', [hash, req.user.id]);
+    res.json({ message: 'Parol o'zgartirildi' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Mentor profile - update avatar
+router.put('/profile/avatar', async (req, res) => {
+  const db = req.app.get('db');
+  const { avatar_url } = req.body;
+  try {
+    await db.query('UPDATE mentors SET avatar_url=$1 WHERE id=$2', [avatar_url, req.user.id]);
+    res.json({ message: 'Avatar yangilandi' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
