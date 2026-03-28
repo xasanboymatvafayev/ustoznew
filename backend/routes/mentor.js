@@ -58,7 +58,7 @@ router.delete('/groups/:groupId/members/:userId', async (req, res) => {
   try {
     await db.query('DELETE FROM group_members WHERE group_id=$1 AND user_id=$2',
       [req.params.groupId, req.params.userId]);
-    res.json({ message: 'O\'quvchi guruhdan chiqarildi' });
+    res.json({ message: "O'quvchi guruhdan chiqarildi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -206,7 +206,7 @@ router.put('/groups/:id/schedule/edit', async (req, res) => {
         );
       }
     }
-    res.json({ message: 'Jadval yangilandi' });
+    res.json({ message: "Jadval yangilandi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -250,7 +250,7 @@ router.post('/groups/:id/attendance', async (req, res) => {
         [req.params.id, rec.user_id, date, rec.status, req.user.id]
       );
     }
-    res.json({ message: 'Davomat saqlandi' });
+    res.json({ message: "Davomat saqlandi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -318,10 +318,10 @@ router.put('/profile/password', async (req, res) => {
     const mentor = await db.query('SELECT * FROM mentors WHERE id=$1', [req.user.id]);
     if (!mentor.rows[0]) return res.status(404).json({ error: 'Topilmadi' });
     const ok = await bcrypt.compare(old_password, mentor.rows[0].password_hash);
-    if (!ok) return res.status(400).json({ error: 'Eski parol noto'g'ri' });
+    if (!ok) return res.status(400).json({ error: "Eski parol noto'g'ri" });
     const hash = await bcrypt.hash(new_password, 10);
     await db.query('UPDATE mentors SET password_hash=$1 WHERE id=$2', [hash, req.user.id]);
-    res.json({ message: 'Parol o'zgartirildi' });
+    res.json({ message: "Parol o'zgartirildi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -333,7 +333,7 @@ router.put('/profile/avatar', async (req, res) => {
   const { avatar_url } = req.body;
   try {
     await db.query('UPDATE mentors SET avatar_url=$1 WHERE id=$2', [avatar_url, req.user.id]);
-    res.json({ message: 'Avatar yangilandi' });
+    res.json({ message: "Avatar yangilandi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
