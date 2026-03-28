@@ -151,4 +151,28 @@ router.get('/attendance', async (req, res) => {
   }
 });
 
+
+// Update avatar
+router.put('/profile/avatar', async (req, res) => {
+  const db = req.app.get('db');
+  const { avatar_url } = req.body;
+  try {
+    await db.query('UPDATE users SET avatar_url=$1 WHERE id=$2', [avatar_url, req.user.id]);
+    res.json({ message: 'Avatar yangilandi', avatar_url });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get profile
+router.get('/profile', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const r = await db.query('SELECT id, full_name, email, phone, avatar_url FROM users WHERE id=$1', [req.user.id]);
+    res.json(r.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
