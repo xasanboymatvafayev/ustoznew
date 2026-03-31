@@ -696,8 +696,8 @@ function ScheduleView({ group }) {
     while (d <= end) {
       const day = d.getDay();
       let ok = false;
-      if (lesson_days === 'juft') ok = [1, 3, 5].includes(day);
-      else if (lesson_days === 'toq') ok = [2, 4, 6].includes(day);
+      if (lesson_days === 'juft') ok = [2, 4, 6].includes(day);
+      else if (lesson_days === 'toq') ok = [1, 3, 5].includes(day);
       else ok = day !== 0;
       if (ok) dates.push(d.toISOString().slice(0, 10));
       d.setDate(d.getDate() + 1);
@@ -870,8 +870,8 @@ function AttendanceView({ group }) {
     while (d <= endD) {
       const day = d.getDay();
       let ok = false;
-      if (lesson_days === 'juft') ok = [1, 3, 5].includes(day);
-      else if (lesson_days === 'toq') ok = [2, 4, 6].includes(day);
+      if (lesson_days === 'juft') ok = [2, 4, 6].includes(day);
+      else if (lesson_days === 'toq') ok = [1, 3, 5].includes(day);
       else ok = day !== 0;
       if (ok) dates.push(d.toISOString().slice(0, 10));
       d.setDate(d.getDate() + 1);
