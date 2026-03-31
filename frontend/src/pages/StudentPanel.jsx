@@ -33,6 +33,15 @@ const Sidebar = ({ active, setActive, logout, user }) => {
         ))}
       </nav>
       <div className="sidebar-bottom">
+        <a
+          href="https://t.me/UstozYordamchi_AI_bot"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          style={{ color: '#229ED9', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+        >
+          <span className="icon">✈️</span> Ota-ona paneli
+        </a>
         <button className="nav-item" onClick={logout} style={{ color: 'var(--danger)' }}>
           <span className="icon">🚪</span> Chiqish
         </button>
