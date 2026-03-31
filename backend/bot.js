@@ -328,8 +328,23 @@ bot.on('callback_query', async (query) => {
       `🎓 Guruh: ${groups}\n`;
     return bot.editMessageText(txt, {
       chat_id: chatId, message_id: msgId, parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🏠 Bosh menyu', callback_data: 'menu' }],
+          [{ text: '🚪 Profildan chiqish', callback_data: 'logout' }],
+        ]
+      }
     });
+  }
+
+  // Chiqish
+  if (data === 'logout') {
+    await pool.query('UPDATE users SET telegram_chat_id=null WHERE telegram_chat_id=$1', [chatId.toString()]);
+    clearSession(chatId);
+    return bot.editMessageText(
+      '👋 Profildan chiqdingiz.\n\nQaytadan ulanish uchun /start yozing.',
+      { chat_id: chatId, message_id: msgId }
+    );
   }
 
   // Bosh menyu
