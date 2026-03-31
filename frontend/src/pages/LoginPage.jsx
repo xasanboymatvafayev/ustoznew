@@ -201,6 +201,8 @@ export default function LoginPage() {
     { id: 'forgot',   label: '🔑 Parol' },
   ];
 
+  const BOT_LINK = 'https://t.me/UstozYordamchi_AI_bot';
+
   return (
     <div style={{
       minHeight: '100vh', background: 'var(--bg)',
@@ -486,7 +488,32 @@ export default function LoginPage() {
           )}
         </div>
 
-        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '12px', marginTop: '20px' }}>
+        {/* Ota-ona panel tugmasi */}
+        <div style={{ textAlign: 'center', marginTop: '16px' }}>
+          <a
+            href={BOT_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              background: 'linear-gradient(135deg, #229ED9, #1a7fb5)',
+              color: '#fff', padding: '10px 20px', borderRadius: '12px',
+              textDecoration: 'none', fontSize: '14px', fontWeight: '600',
+              boxShadow: '0 4px 12px rgba(34,158,217,0.35)',
+              transition: 'opacity 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            <span style={{ fontSize: '18px' }}>✈️</span>
+            Ota-ona paneli (Telegram)
+          </a>
+          <p style={{ color: 'var(--text3)', fontSize: '11px', marginTop: '6px' }}>
+            Farzandingiz baholari va davomati
+          </p>
+        </div>
+
+        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '12px', marginTop: '16px' }}>
           © 2024 Ustoz Yordamchi AI · ITpark
         </p>
       </div>
