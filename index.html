@@ -1,0 +1,2977 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ustoz Yordamchi AI — ITpark</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #161c2d;
+    --border: #1e2740;
+    --border2: #263050;
+    --accent: #4f8ef7;
+    --accent2: #7c3aed;
+    --green: #10b981;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --text: #e8eaf0;
+    --text2: #8892a8;
+    --text3: #4a5470;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Sora',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+  
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+  /* UTILS */
+  .hidden { display:none!important; }
+  .flex { display:flex; }
+  .flex-col { flex-direction:column; }
+  .items-center { align-items:center; }
+  .justify-center { justify-content:center; }
+  .justify-between { justify-content:space-between; }
+  .gap-2 { gap:8px; }
+  .gap-3 { gap:12px; }
+  .gap-4 { gap:16px; }
+  .w-full { width:100%; }
+  .text-sm { font-size:13px; }
+  .text-xs { font-size:11px; }
+  .font-bold { font-weight:700; }
+  .font-semibold { font-weight:600; }
+  .mt-2 { margin-top:8px; }
+  .mt-4 { margin-top:16px; }
+  .mb-2 { margin-bottom:8px; }
+
+  /* ========= AUTH PAGES ========= */
+  #auth-container {
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: radial-gradient(ellipse at 20% 50%, rgba(79,142,247,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(124,58,237,0.08) 0%, transparent 60%),
+                var(--bg);
+    padding:20px;
+  }
+  .auth-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:40px;
+    width:100%;
+    max-width:440px;
+    box-shadow: var(--shadow), 0 0 60px rgba(79,142,247,0.04);
+    animation: fadeInUp 0.4s ease;
+  }
+  @keyframes fadeInUp {
+    from { opacity:0; transform:translateY(20px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+  .auth-logo {
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:28px;
+  }
+  .auth-logo-icon {
+    width:42px; height:42px;
+    background: linear-gradient(135deg,#4f8ef7,#7c3aed);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px;
+  }
+  .auth-logo-text { font-size:18px; font-weight:700; }
+  .auth-logo-sub { font-size:11px; color:var(--text2); letter-spacing:0.05em; }
+  .auth-title { font-size:24px; font-weight:700; margin-bottom:6px; }
+  .auth-sub { font-size:13px; color:var(--text2); margin-bottom:28px; }
+  
+  .auth-tabs {
+    display:flex; gap:4px;
+    background:var(--surface2); border-radius:10px; padding:4px;
+    margin-bottom:24px;
+  }
+  .auth-tab {
+    flex:1; padding:9px; border-radius:8px; border:none;
+    cursor:pointer; font-family:'Sora',sans-serif; font-size:13px;
+    font-weight:500; color:var(--text2); background:transparent;
+    transition:all 0.2s;
+  }
+  .auth-tab.active {
+    background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(79,142,247,0.3);
+  }
+
+  .form-group { margin-bottom:16px; }
+  .form-label { font-size:12px; font-weight:600; color:var(--text2); letter-spacing:0.04em; margin-bottom:6px; display:block; }
+  .form-input {
+    width:100%; padding:11px 14px;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; color:var(--text);
+    font-family:'Sora',sans-serif; font-size:14px;
+    outline:none; transition:border-color 0.2s, box-shadow 0.2s;
+  }
+  .form-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,142,247,0.1); }
+  .form-input::placeholder { color:var(--text3); }
+
+  .btn {
+    padding:12px 20px; border-radius:10px; border:none;
+    cursor:pointer; font-family:'Sora',sans-serif; font-size:14px;
+    font-weight:600; transition:all 0.2s; display:inline-flex;
+    align-items:center; justify-content:center; gap:8px;
+  }
+  .btn-primary {
+    background:linear-gradient(135deg,#4f8ef7,#7c3aed);
+    color:#fff; width:100%;
+    box-shadow:0 4px 15px rgba(79,142,247,0.3);
+  }
+  .btn-primary:hover { opacity:0.9; transform:translateY(-1px); box-shadow:0 6px 20px rgba(79,142,247,0.4); }
+  .btn-primary:active { transform:translateY(0); }
+  .btn-secondary {
+    background:var(--surface2); border:1px solid var(--border);
+    color:var(--text2); width:100%;
+  }
+  .btn-secondary:hover { border-color:var(--accent); color:var(--text); }
+  .btn-sm { padding:7px 14px; font-size:12px; }
+  .btn-danger { background:rgba(239,68,68,0.15); color:var(--red); border:1px solid rgba(239,68,68,0.3); }
+  .btn-danger:hover { background:rgba(239,68,68,0.25); }
+  .btn-green { background:rgba(16,185,129,0.15); color:var(--green); border:1px solid rgba(16,185,129,0.3); }
+  .btn-green:hover { background:rgba(16,185,129,0.25); }
+  .btn-icon {
+    padding:8px; border-radius:8px; background:var(--surface2);
+    border:1px solid var(--border); color:var(--text2);
+  }
+  .btn-icon:hover { border-color:var(--accent); color:var(--accent); }
+
+  .divider { 
+    display:flex; align-items:center; gap:12px; 
+    margin:20px 0; color:var(--text3); font-size:12px;
+  }
+  .divider::before, .divider::after {
+    content:''; flex:1; height:1px; background:var(--border);
+  }
+
+  .alert {
+    padding:12px 14px; border-radius:10px; font-size:13px;
+    margin-bottom:16px; display:flex; align-items:flex-start; gap:8px;
+  }
+  .alert-error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); color:#f87171; }
+  .alert-success { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2); color:#34d399; }
+  .alert-warn { background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2); color:#fbbf24; }
+  .alert-info { background:rgba(79,142,247,0.1); border:1px solid rgba(79,142,247,0.2); color:#93c5fd; }
+
+  .mentor-card {
+    display:flex; align-items:center; gap:12px;
+    padding:14px; border:1px solid var(--border); border-radius:12px;
+    cursor:pointer; margin-bottom:10px; transition:all 0.2s;
+    background:var(--surface2);
+  }
+  .mentor-card:hover { border-color:var(--accent); background:rgba(79,142,247,0.05); }
+  .mentor-card.selected { border-color:var(--accent); background:rgba(79,142,247,0.08); }
+  .mentor-avatar {
+    width:44px; height:44px; border-radius:10px;
+    background:linear-gradient(135deg,#4f8ef7,#7c3aed);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:700; flex-shrink:0;
+  }
+  .admin-key-btn {
+    position:fixed; bottom:20px; right:20px;
+    width:44px; height:44px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--border);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-size:18px; transition:all 0.2s; z-index:100;
+    box-shadow:var(--shadow);
+  }
+  .admin-key-btn:hover { border-color:var(--accent); transform:scale(1.05); }
+
+  /* ========= MAIN APP LAYOUT ========= */
+  #app-container { display:flex; min-height:100vh; }
+  
+  .sidebar {
+    width:260px; background:var(--surface); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0;
+    z-index:50; transition:transform 0.3s;
+  }
+  .sidebar-logo {
+    padding:20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px;
+  }
+  .sidebar-logo-icon {
+    width:36px; height:36px;
+    background:linear-gradient(135deg,#4f8ef7,#7c3aed);
+    border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:16px;
+  }
+  .sidebar-logo-text { font-size:15px; font-weight:700; }
+  .sidebar-logo-role { font-size:10px; color:var(--text3); letter-spacing:0.06em; text-transform:uppercase; }
+  
+  .sidebar-nav { flex:1; overflow-y:auto; padding:12px; }
+  .nav-section-title {
+    font-size:10px; font-weight:600; color:var(--text3);
+    letter-spacing:0.1em; text-transform:uppercase;
+    padding:8px 8px 6px; margin-top:8px;
+  }
+  .nav-item {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px; border-radius:9px; cursor:pointer;
+    color:var(--text2); font-size:13px; font-weight:500;
+    transition:all 0.15s; margin-bottom:2px;
+  }
+  .nav-item:hover { background:var(--surface2); color:var(--text); }
+  .nav-item.active { background:rgba(79,142,247,0.12); color:var(--accent); }
+  .nav-item-icon { width:20px; text-align:center; font-size:16px; }
+  .nav-badge {
+    margin-left:auto; background:var(--accent);
+    color:#fff; font-size:10px; padding:2px 7px; border-radius:20px;
+  }
+
+  .sidebar-bottom {
+    padding:12px; border-top:1px solid var(--border);
+  }
+  .user-info {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px; border-radius:10px; cursor:pointer;
+    transition:background 0.15s;
+  }
+  .user-info:hover { background:var(--surface2); }
+  .user-avatar {
+    width:34px; height:34px; border-radius:9px;
+    background:linear-gradient(135deg,#10b981,#059669);
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700; flex-shrink:0;
+  }
+  .user-name { font-size:13px; font-weight:600; }
+  .user-role { font-size:11px; color:var(--text3); }
+
+  /* MAIN CONTENT */
+  .main-content {
+    margin-left:260px; flex:1; padding:28px;
+    max-width:calc(100vw - 260px);
+  }
+  .page { display:none; }
+  .page.active { display:block; animation:fadeInUp 0.3s ease; }
+
+  .page-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:24px;
+  }
+  .page-title { font-size:22px; font-weight:700; }
+  .page-sub { font-size:13px; color:var(--text2); margin-top:2px; }
+
+  /* STATS GRID */
+  .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+  @media(max-width:1100px) { .stats-grid { grid-template-columns:repeat(2,1fr); } }
+  .stat-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:20px;
+    transition:border-color 0.2s;
+  }
+  .stat-card:hover { border-color:var(--border2); }
+  .stat-icon { font-size:28px; margin-bottom:10px; }
+  .stat-num { font-size:28px; font-weight:800; font-family:'JetBrains Mono',monospace; }
+  .stat-label { font-size:12px; color:var(--text2); margin-top:4px; }
+
+  /* CARDS */
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:20px;
+  }
+  .card-title {
+    font-size:15px; font-weight:700; margin-bottom:16px;
+    display:flex; align-items:center; gap:8px;
+  }
+
+  /* GRID */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+
+  /* TABLE */
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; }
+  th {
+    text-align:left; font-size:11px; font-weight:600;
+    color:var(--text3); letter-spacing:0.06em; text-transform:uppercase;
+    padding:10px 14px; border-bottom:1px solid var(--border);
+  }
+  td { padding:12px 14px; font-size:13px; border-bottom:1px solid rgba(30,39,64,0.5); }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(79,142,247,0.03); }
+
+  /* BADGES */
+  .badge {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;
+  }
+  .badge-green { background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.2); }
+  .badge-blue { background:rgba(79,142,247,0.12); color:#93c5fd; border:1px solid rgba(79,142,247,0.2); }
+  .badge-orange { background:rgba(245,158,11,0.12); color:#fbbf24; border:1px solid rgba(245,158,11,0.2); }
+  .badge-red { background:rgba(239,68,68,0.12); color:#f87171; border:1px solid rgba(239,68,68,0.2); }
+  .badge-purple { background:rgba(124,58,237,0.12); color:#c4b5fd; border:1px solid rgba(124,58,237,0.2); }
+
+  /* MODAL */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    backdrop-filter:blur(4px); z-index:200;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; padding:28px; width:100%;
+    max-width:520px; max-height:90vh; overflow-y:auto;
+    box-shadow:var(--shadow); animation:fadeInUp 0.25s ease;
+  }
+  .modal-title { font-size:18px; font-weight:700; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; }
+  .modal-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:20px; }
+  .modal-close:hover { color:var(--text); }
+
+  /* CHAT */
+  .chat-messages {
+    height:400px; overflow-y:auto; padding:16px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .chat-msg {
+    max-width:75%; padding:10px 14px; border-radius:12px;
+    font-size:13px; line-height:1.5;
+  }
+  .chat-msg.mine {
+    background:linear-gradient(135deg,#4f8ef7,#7c3aed); color:#fff;
+    align-self:flex-end; border-bottom-right-radius:4px;
+  }
+  .chat-msg.other {
+    background:var(--surface2); border:1px solid var(--border);
+    align-self:flex-start; border-bottom-left-radius:4px;
+  }
+  .chat-msg-meta { font-size:10px; opacity:0.6; margin-top:4px; }
+  .chat-input-wrap {
+    display:flex; gap:8px; padding:12px;
+    border-top:1px solid var(--border);
+  }
+  .chat-input {
+    flex:1; padding:10px 14px; background:var(--surface2);
+    border:1px solid var(--border); border-radius:10px;
+    color:var(--text); font-family:'Sora',sans-serif; font-size:13px;
+    outline:none;
+  }
+  .chat-input:focus { border-color:var(--accent); }
+
+  /* CALENDAR */
+  .calendar-grid {
+    display:grid; grid-template-columns:repeat(7,1fr);
+    gap:4px; margin-top:12px;
+  }
+  .cal-header { text-align:center; font-size:11px; color:var(--text3); font-weight:600; padding:6px; }
+  .cal-day {
+    aspect-ratio:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    border-radius:8px; cursor:pointer; font-size:13px;
+    position:relative; transition:all 0.15s;
+  }
+  .cal-day:hover { background:var(--surface2); }
+  .cal-day.today { background:rgba(79,142,247,0.15); color:var(--accent); font-weight:700; }
+  .cal-day.has-event::after {
+    content:''; position:absolute; bottom:4px;
+    width:4px; height:4px; border-radius:50%;
+    background:var(--accent);
+  }
+  .cal-day.other-month { color:var(--text3); }
+
+  /* JADVAL (Schedule Table) */
+  .schedule-table-wrap { overflow-x:auto; margin-top:12px; }
+  .schedule-table {
+    border-collapse:collapse; min-width:800px;
+    font-size:12px;
+  }
+  .schedule-table th, .schedule-table td {
+    border:1px solid var(--border); padding:8px 10px;
+    white-space:nowrap;
+  }
+  .schedule-table th { background:var(--surface2); font-size:11px; text-transform:none; }
+  .schedule-table td.student-name { font-weight:600; background:var(--surface2); position:sticky; left:0; z-index:1; }
+  .schedule-cell-done { background:rgba(16,185,129,0.12); color:#34d399; border-radius:4px; padding:3px 8px; cursor:pointer; font-weight:600; }
+  .schedule-cell-miss { color:var(--text3); }
+  .schedule-cell-score { font-family:'JetBrains Mono',monospace; font-weight:700; }
+  .schedule-add-task { background:rgba(79,142,247,0.1); color:var(--accent); border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
+
+  /* TASK CARDS */
+  .task-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:16px; margin-bottom:12px;
+    transition:border-color 0.2s;
+  }
+  .task-card:hover { border-color:var(--border2); }
+  .task-tabs {
+    display:flex; gap:4px; margin-bottom:20px;
+    background:var(--surface2); border-radius:10px; padding:4px;
+  }
+  .task-tab {
+    padding:8px 16px; border-radius:8px; border:none;
+    cursor:pointer; font-family:'Sora',sans-serif; font-size:13px;
+    font-weight:500; color:var(--text2); background:transparent;
+    transition:all 0.2s;
+  }
+  .task-tab.active {
+    background:var(--accent); color:#fff;
+  }
+
+  /* PROGRESS BAR */
+  .progress-bar {
+    height:6px; background:var(--surface2); border-radius:3px; overflow:hidden;
+  }
+  .progress-fill {
+    height:100%; border-radius:3px;
+    background:linear-gradient(90deg,#4f8ef7,#7c3aed);
+    transition:width 0.5s ease;
+  }
+
+  /* AI RESPONSE */
+  .ai-response {
+    background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.2);
+    border-radius:10px; padding:14px;
+    font-size:13px; line-height:1.7; color:var(--text2);
+    margin-top:12px; position:relative;
+  }
+  .ai-response::before {
+    content:'🤖 AI Baholash';
+    display:block; font-size:11px; font-weight:700;
+    color:var(--accent2); margin-bottom:8px; letter-spacing:0.05em;
+  }
+
+  /* TOAST */
+  .toast-container { position:fixed; top:20px; right:20px; z-index:1000; display:flex; flex-direction:column; gap:8px; }
+  .toast {
+    padding:12px 16px; border-radius:10px; font-size:13px;
+    background:var(--surface); border:1px solid var(--border);
+    box-shadow:var(--shadow); animation:slideInRight 0.3s ease;
+    display:flex; align-items:center; gap:8px; max-width:320px;
+  }
+  @keyframes slideInRight {
+    from { transform:translateX(120%); opacity:0; }
+    to { transform:translateX(0); opacity:1; }
+  }
+  .toast-success { border-color:rgba(16,185,129,0.3); }
+  .toast-error { border-color:rgba(239,68,68,0.3); }
+
+  /* LOADING */
+  .spinner {
+    width:20px; height:20px; border-radius:50%;
+    border:2px solid var(--border); border-top-color:var(--accent);
+    animation:spin 0.7s linear infinite; display:inline-block;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* RESPONSIVE */
+  @media(max-width:768px) {
+    .sidebar { transform:translateX(-100%); }
+    .sidebar.open { transform:translateX(0); }
+    .main-content { margin-left:0; }
+    .stats-grid { grid-template-columns:1fr 1fr; }
+    .grid-2, .grid-3 { grid-template-columns:1fr; }
+  }
+
+  /* MENTOR SELECT ON LOGIN */
+  .mentor-list { max-height:280px; overflow-y:auto; }
+
+  /* SCORE INPUT */
+  .score-input {
+    width:60px; padding:5px 8px; background:var(--surface2);
+    border:1px solid var(--border); border-radius:6px;
+    color:var(--text); font-family:'JetBrains Mono',monospace;
+    font-size:13px; text-align:center; outline:none;
+  }
+  .score-input:focus { border-color:var(--accent); }
+
+  /* EDITABLE CELL */
+  .editable-cell {
+    cursor:pointer; border-radius:4px; padding:3px 6px;
+    transition:background 0.15s;
+  }
+  .editable-cell:hover { background:var(--surface2); }
+
+  /* REYTING */
+  .reyting-num {
+    width:28px; height:28px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700;
+  }
+  .reyting-1 { background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; }
+  .reyting-2 { background:linear-gradient(135deg,#94a3b8,#64748b); color:#fff; }
+  .reyting-3 { background:linear-gradient(135deg,#b45309,#92400e); color:#fff; }
+
+  /* SUBMISSION CARD */
+  .submission-card {
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; padding:14px; margin-bottom:10px;
+  }
+
+  /* GROUP CARD */
+  .group-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:18px; transition:all 0.2s;
+  }
+  .group-card:hover { border-color:var(--border2); transform:translateY(-1px); }
+
+  /* TABS */
+  .tab-content { display:none; }
+  .tab-content.active { display:block; animation:fadeInUp 0.2s ease; }
+
+  /* STUDENT TASK SUBMIT */
+  .task-submit-area {
+    width:100%; min-height:120px; padding:12px;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; color:var(--text);
+    font-family:'Sora',sans-serif; font-size:13px;
+    resize:vertical; outline:none; line-height:1.6;
+  }
+  .task-submit-area:focus { border-color:var(--accent); }
+
+  /* SEPARATOR */
+  .sep { height:1px; background:var(--border); margin:16px 0; }
+
+  /* NOTIFICATION DOT */
+  .notif-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:var(--red); margin-left:auto; flex-shrink:0;
+  }
+
+  /* INLINE EDITABLE TABLE */
+  .inline-edit:focus {
+    outline:none; background:var(--surface2);
+    border:1px solid var(--accent); border-radius:4px; padding:2px 6px;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ============================================
+     AUTH SECTION
+============================================ -->
+<div id="auth-container">
+  
+  <!-- MAIN LOGIN SCREEN -->
+  <div id="main-login-screen" class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🎓</div>
+      <div>
+        <div class="auth-logo-text">Ustoz Yordamchi</div>
+        <div class="auth-logo-sub">ITpark · AI ta'lim platformasi</div>
+      </div>
+    </div>
+    <h2 class="auth-title">Kirish usulini tanlang</h2>
+    <p class="auth-sub">Quyidagi usullardan birini tanlang</p>
+
+    <div id="main-login-alert"></div>
+
+    <button class="btn btn-secondary" style="margin-bottom:12px;justify-content:flex-start;gap:12px;" onclick="showScreen('mentor-login')">
+      <span style="font-size:20px;">👨‍💻</span>
+      <div style="text-align:left;">
+        <div style="font-weight:600;color:var(--text);">Mentor sifatida kirish</div>
+        <div style="font-size:11px;color:var(--text3);">Mentor login va parol bilan</div>
+      </div>
+    </button>
+
+    <button class="btn btn-secondary" style="margin-bottom:12px;justify-content:flex-start;gap:12px;" onclick="showScreen('student-login')">
+      <span style="font-size:20px;">👨‍🎓</span>
+      <div style="text-align:left;">
+        <div style="font-weight:600;color:var(--text);">O'quvchi sifatida kirish</div>
+        <div style="font-size:11px;color:var(--text3);">Email va parol bilan</div>
+      </div>
+    </button>
+
+    <div class="divider">yoki</div>
+
+    <button class="btn btn-primary" onclick="showScreen('register')">
+      Ro'yxatdan o'tish
+    </button>
+  </div>
+
+  <!-- MENTOR LOGIN -->
+  <div id="mentor-login-screen" class="auth-card hidden">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">👨‍💻</div>
+      <div>
+        <div class="auth-logo-text">Mentor Panel</div>
+        <div class="auth-logo-sub">ITpark · Ustoz Yordamchi</div>
+      </div>
+    </div>
+    <h2 class="auth-title">Mentor kirishi</h2>
+    <p class="auth-sub">Telefon raqam va parol kiriting</p>
+    <div id="mentor-login-alert"></div>
+    <div class="form-group">
+      <label class="form-label">TELEFON RAQAM</label>
+      <input class="form-input" id="mentor-phone" placeholder="+998 90 123 45 67" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">PAROL</label>
+      <input class="form-input" id="mentor-pass" placeholder="••••••••" type="password">
+    </div>
+    <button class="btn btn-primary" onclick="mentorLogin()">Kirish</button>
+    <button class="btn btn-secondary mt-2" onclick="showScreen('main-login')">← Orqaga</button>
+  </div>
+
+  <!-- STUDENT LOGIN -->
+  <div id="student-login-screen" class="auth-card hidden">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">👨‍🎓</div>
+      <div>
+        <div class="auth-logo-text">O'quvchi Kabineti</div>
+        <div class="auth-logo-sub">ITpark · Ustoz Yordamchi</div>
+      </div>
+    </div>
+    <h2 class="auth-title">O'quvchi kirishi</h2>
+    <p class="auth-sub">Email va parol kiriting</p>
+    <div id="student-login-alert"></div>
+    <div class="form-group">
+      <label class="form-label">EMAIL</label>
+      <input class="form-input" id="student-email" placeholder="email@example.com" type="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">PAROL</label>
+      <input class="form-input" id="student-pass" placeholder="••••••••" type="password">
+    </div>
+    <button class="btn btn-primary" onclick="studentLogin()">Kirish</button>
+    <div class="divider">yoki</div>
+    <button class="btn btn-secondary" onclick="showScreen('forgot-password')">Parolni unutdingizmi?</button>
+    <button class="btn btn-secondary mt-2" onclick="showScreen('main-login')">← Orqaga</button>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="register-screen" class="auth-card hidden" style="max-width:500px;">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">📝</div>
+      <div>
+        <div class="auth-logo-text">Ro'yxatdan o'tish</div>
+        <div class="auth-logo-sub">ITpark · Ustoz Yordamchi</div>
+      </div>
+    </div>
+    <div id="register-alert"></div>
+    <div id="register-step-1">
+      <div class="form-group">
+        <label class="form-label">LOGIN (username)</label>
+        <input class="form-input" id="reg-login" placeholder="mylogin123" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ISM FAMILYA</label>
+        <input class="form-input" id="reg-name" placeholder="Abdullayev Abror" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label">TELEFON RAQAM</label>
+        <input class="form-input" id="reg-phone" placeholder="+998 90 123 45 67" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label">EMAIL</label>
+        <input class="form-input" id="reg-email" placeholder="email@example.com" type="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">PAROL</label>
+        <input class="form-input" id="reg-pass" placeholder="Kamida 6 ta belgi" type="password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">GURUH NOMI</label>
+        <input class="form-input" id="reg-group" placeholder="Guruh nomini kiriting" type="text" oninput="checkGroupName()">
+        <div id="group-check-msg" style="font-size:12px;margin-top:6px;"></div>
+      </div>
+      <button class="btn btn-primary" onclick="registerStep1()">Davom etish →</button>
+      <button class="btn btn-secondary mt-2" onclick="showScreen('main-login')">← Orqaga</button>
+    </div>
+    <!-- OTP STEP -->
+    <div id="register-step-2" class="hidden">
+      <p style="font-size:14px;color:var(--text2);margin-bottom:16px;">
+        📧 <span id="reg-email-shown"></span> manzilingizga tasdiqlash kodi yuborildi
+      </p>
+      <div class="form-group">
+        <label class="form-label">TASDIQLASH KODI</label>
+        <input class="form-input" id="reg-otp" placeholder="6 raqamli kod" type="text" style="font-family:'JetBrains Mono';letter-spacing:0.2em;font-size:18px;text-align:center;">
+      </div>
+      <button class="btn btn-primary" onclick="verifyRegOTP()">Tasdiqlash ✓</button>
+      <button class="btn btn-secondary mt-2" onclick="resendOTP()">Qayta yuborish</button>
+    </div>
+    <!-- EXISTING USER FOUND -->
+    <div id="register-step-existing" class="hidden">
+      <div class="alert alert-warn">⚠️ Bu email orqali avval ro'yxatdan o'tilgan!</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Nima qilmoqchisiz?</p>
+      <button class="btn btn-primary" style="margin-bottom:10px;" onclick="loginExistingUser()">Mavjud akkauntga kirish</button>
+      <button class="btn btn-secondary" onclick="deleteAndReregister()">Yangi akkaunt ochish (eski o'chadi)</button>
+      <button class="btn btn-secondary mt-2" onclick="showScreen('main-login')">← Bekor qilish</button>
+    </div>
+  </div>
+
+  <!-- FORGOT PASSWORD -->
+  <div id="forgot-password-screen" class="auth-card hidden">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🔑</div>
+      <div>
+        <div class="auth-logo-text">Parolni tiklash</div>
+        <div class="auth-logo-sub">ITpark · Ustoz Yordamchi</div>
+      </div>
+    </div>
+    <div id="forgot-alert"></div>
+    <div id="forgot-step-1">
+      <div class="form-group">
+        <label class="form-label">EMAIL</label>
+        <input class="form-input" id="forgot-email" placeholder="email@example.com" type="email">
+      </div>
+      <button class="btn btn-primary" onclick="forgotStep1()">Kod yuborish</button>
+      <button class="btn btn-secondary mt-2" onclick="showScreen('student-login')">← Orqaga</button>
+    </div>
+    <div id="forgot-step-2" class="hidden">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">📧 Emailga tasdiqlash kodi yuborildi. Kodni kiriting:</p>
+      <div class="form-group">
+        <label class="form-label">TASDIQLASH KODI</label>
+        <input class="form-input" id="forgot-otp" placeholder="6 raqamli kod" type="text" style="font-family:'JetBrains Mono';letter-spacing:0.2em;font-size:18px;text-align:center;">
+      </div>
+      <button class="btn btn-primary" onclick="forgotVerifyOTP()">Tasdiqlash</button>
+    </div>
+    <div id="forgot-step-3" class="hidden">
+      <div class="alert alert-success">✅ Tasdiqlash muvaffaqiyatli!</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Emailingizga login va parol yuborildi.</p>
+      <button class="btn btn-primary" onclick="showScreen('student-login')">Kirish sahifasiga →</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================
+     ADMIN PANEL
+============================================ -->
+<div id="admin-panel" class="hidden" style="display:none;">
+  <div class="sidebar" id="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🎓</div>
+      <div>
+        <div class="sidebar-logo-text">Ustoz Yordamchi</div>
+        <div class="sidebar-logo-role">Admin Panel</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Boshqaruv</div>
+      <div class="nav-item active" onclick="adminNav('dashboard')" data-page="dashboard">
+        <span class="nav-item-icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="adminNav('mentors')" data-page="mentors">
+        <span class="nav-item-icon">👨‍💻</span> Mentorlar
+      </div>
+      <div class="nav-item" onclick="adminNav('groups')" data-page="groups">
+        <span class="nav-item-icon">👥</span> Guruhlar
+      </div>
+      <div class="nav-item" onclick="adminNav('students')" data-page="students">
+        <span class="nav-item-icon">👨‍🎓</span> O'quvchilar
+      </div>
+      <div class="nav-item" onclick="adminNav('calendar-admin')" data-page="calendar-admin">
+        <span class="nav-item-icon">📅</span> Kalendar
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="user-info">
+        <div class="user-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">A</div>
+        <div>
+          <div class="user-name">Admin</div>
+          <div class="user-role">Tizim administratori</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary w-full mt-2" onclick="logout()" style="font-size:12px;padding:9px;">🚪 Chiqish</button>
+    </div>
+  </div>
+  <div class="main-content" id="admin-main">
+    <!-- ADMIN DASHBOARD -->
+    <div class="page active" id="admin-page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub">Tizim umumiy ko'rinishi</div>
+        </div>
+      </div>
+      <div class="stats-grid" id="admin-stats"></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">👥 Guruhlar ro'yxati</div>
+          <div id="admin-groups-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">👨‍💻 Mentorlar</div>
+          <div id="admin-mentors-list"></div>
+        </div>
+      </div>
+    </div>
+    <!-- ADMIN MENTORS -->
+    <div class="page" id="admin-page-mentors">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Mentorlar</div>
+          <div class="page-sub">Mentor qo'shish va boshqarish</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddMentorModal()">+ Mentor qo'shish</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="mentors-table">
+            <thead><tr><th>#</th><th>Ism Familya</th><th>Telefon</th><th>Guruhlar</th><th>Holat</th><th>Amallar</th></tr></thead>
+            <tbody id="mentors-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- ADMIN GROUPS -->
+    <div class="page" id="admin-page-groups">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Guruhlar</div>
+          <div class="page-sub">Guruh qo'shish va boshqarish</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddGroupModal()">+ Guruh qo'shish</button>
+      </div>
+      <div id="admin-groups-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
+    </div>
+    <!-- ADMIN STUDENTS -->
+    <div class="page" id="admin-page-students">
+      <div class="page-header">
+        <div>
+          <div class="page-title">O'quvchilar</div>
+          <div class="page-sub">Barcha ro'yxatdan o'tgan o'quvchilar</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Ism</th><th>Login</th><th>Email</th><th>Telefon</th><th>Guruh</th><th>Sana</th></tr></thead>
+            <tbody id="students-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- ADMIN CALENDAR -->
+    <div class="page" id="admin-page-calendar-admin">
+      <div class="page-header">
+        <div><div class="page-title">Kalendar</div><div class="page-sub">Dars va tadbirlarni qo'shish</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openAddEventModal()">+ Tadbir qo'shish</button>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📅 Kalendar</div>
+          <div id="admin-calendar"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Tadbirlar</div>
+          <div id="admin-events-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MENTOR PANEL
+============================================ -->
+<div id="mentor-panel" class="hidden" style="display:none;">
+  <div class="sidebar" id="mentor-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">👨‍💻</div>
+      <div>
+        <div class="sidebar-logo-text" id="mentor-sidebar-name">Mentor</div>
+        <div class="sidebar-logo-role">Mentor Panel</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Bosh menu</div>
+      <div class="nav-item active" onclick="mentorNav('m-dashboard')" data-page="m-dashboard">
+        <span class="nav-item-icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="mentorNav('m-groups')" data-page="m-groups">
+        <span class="nav-item-icon">👥</span> Guruhlarim
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="user-info" id="mentor-user-info">
+        <div class="user-avatar">M</div>
+        <div>
+          <div class="user-name" id="mentor-sidebar-name2">Mentor</div>
+          <div class="user-role">Mentor</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary w-full mt-2" onclick="logout()" style="font-size:12px;padding:9px;">🚪 Chiqish</button>
+    </div>
+  </div>
+  <div class="main-content" id="mentor-main">
+    <!-- MENTOR DASHBOARD -->
+    <div class="page active" id="mentor-page-m-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="mentor-welcome">Salom, Mentor!</div>
+          <div class="page-sub">Bugungi faoliyatingiz</div>
+        </div>
+      </div>
+      <div class="stats-grid" id="mentor-stats"></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">👥 Guruhlarim</div>
+          <div id="mentor-my-groups"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 Kalendar</div>
+          <div id="mentor-calendar"></div>
+        </div>
+      </div>
+    </div>
+    <!-- MENTOR GROUPS -->
+    <div class="page" id="mentor-page-m-groups">
+      <div class="page-header">
+        <div><div class="page-title">Guruhlarim</div><div class="page-sub">O'quvchilar va vazifalar</div></div>
+      </div>
+      <div id="mentor-groups-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     STUDENT PANEL
+============================================ -->
+<div id="student-panel" class="hidden" style="display:none;">
+  <div class="sidebar" id="student-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">👨‍🎓</div>
+      <div>
+        <div class="sidebar-logo-text" id="student-sidebar-name">O'quvchi</div>
+        <div class="sidebar-logo-role">O'quvchi Kabineti</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Menu</div>
+      <div class="nav-item active" onclick="studentNav('s-dashboard')" data-page="s-dashboard">
+        <span class="nav-item-icon">🏠</span> Bosh sahifa
+      </div>
+      <div class="nav-item" onclick="studentNav('s-tasks')" data-page="s-tasks">
+        <span class="nav-item-icon">📝</span> Vazifalar
+      </div>
+      <div class="nav-item" onclick="studentNav('s-chat')" data-page="s-chat">
+        <span class="nav-item-icon">💬</span> Guruh chati
+      </div>
+      <div class="nav-item" onclick="studentNav('s-profile')" data-page="s-profile">
+        <span class="nav-item-icon">👤</span> Profil
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="user-info">
+        <div class="user-avatar" id="student-avatar-sidebar">O</div>
+        <div>
+          <div class="user-name" id="student-name-sidebar">O'quvchi</div>
+          <div class="user-role" id="student-group-sidebar">Guruh</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary w-full mt-2" onclick="logout()" style="font-size:12px;padding:9px;">🚪 Chiqish</button>
+    </div>
+  </div>
+  <div class="main-content" id="student-main">
+    <!-- STUDENT DASHBOARD -->
+    <div class="page active" id="student-page-s-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="student-welcome">Salom!</div>
+          <div class="page-sub">Bugungi faoliyatingiz</div>
+        </div>
+      </div>
+      <div class="stats-grid" id="student-stats"></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📊 Faollik</div>
+          <div id="student-activity"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 Kalendar</div>
+          <div id="student-calendar"></div>
+        </div>
+      </div>
+    </div>
+    <!-- STUDENT TASKS -->
+    <div class="page" id="student-page-s-tasks">
+      <div class="page-header">
+        <div><div class="page-title">Vazifalar</div><div class="page-sub">Uy va dars vazifalari</div></div>
+      </div>
+      <div class="task-tabs">
+        <button class="task-tab active" onclick="switchTaskTab('home-tasks')">🏠 Uyga vazifalar</button>
+        <button class="task-tab" onclick="switchTaskTab('class-tasks')">📖 Darsda vazifalar</button>
+      </div>
+      <div id="home-tasks" class="tab-content active"></div>
+      <div id="class-tasks" class="tab-content"></div>
+    </div>
+    <!-- STUDENT CHAT -->
+    <div class="page" id="student-page-s-chat">
+      <div class="page-header">
+        <div><div class="page-title">Guruh Chati</div><div class="page-sub" id="student-chat-group-name">Guruh</div></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="chat-messages" id="student-chat-messages"></div>
+        <div class="chat-input-wrap">
+          <input class="chat-input" id="student-chat-input" placeholder="Xabar yozing..." onkeydown="if(event.key==='Enter')sendStudentChat()">
+          <button class="btn btn-primary btn-sm" onclick="sendStudentChat()" style="width:auto;padding:10px 16px;">➤</button>
+        </div>
+      </div>
+    </div>
+    <!-- STUDENT PROFILE -->
+    <div class="page" id="student-page-s-profile">
+      <div class="page-header">
+        <div><div class="page-title">Profil</div><div class="page-sub">Shaxsiy ma'lumotlar</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">👤 Ma'lumotlarim</div>
+          <div id="student-profile-info"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔐 Parol o'zgartirish</div>
+          <div id="change-pass-alert"></div>
+          <div class="form-group">
+            <label class="form-label">JORIY PAROL</label>
+            <input class="form-input" id="current-pass" type="password" placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label class="form-label">YANGI PAROL</label>
+            <input class="form-input" id="new-pass" type="password" placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label class="form-label">YANGI PAROLNI TASDIQLASH</label>
+            <input class="form-input" id="confirm-new-pass" type="password" placeholder="••••••••">
+          </div>
+          <button class="btn btn-primary" onclick="changePassword()">Parolni o'zgartirish</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     ADMIN KEY BUTTON (always visible on auth)
+============================================ -->
+<button class="admin-key-btn" id="admin-key-btn" onclick="promptAdminKey()" title="Admin kirish">🔑</button>
+
+<!-- ============================================
+     MODALS
+============================================ -->
+
+<!-- ADD MENTOR MODAL -->
+<div class="modal-overlay hidden" id="add-mentor-modal">
+  <div class="modal">
+    <div class="modal-title">👨‍💻 Mentor qo'shish <button class="modal-close" onclick="closeModal('add-mentor-modal')">✕</button></div>
+    <div id="add-mentor-alert"></div>
+    <div class="form-group">
+      <label class="form-label">ISM FAMILYA</label>
+      <input class="form-input" id="new-mentor-name" placeholder="Ism Familya" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">TELEFON RAQAM</label>
+      <input class="form-input" id="new-mentor-phone" placeholder="+998 90 123 45 67" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">PAROL</label>
+      <input class="form-input" id="new-mentor-pass" placeholder="Mentor paroli" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">GURUH(LAR) NOMI</label>
+      <div id="mentor-groups-inputs">
+        <input class="form-input" style="margin-bottom:8px;" placeholder="1-guruh nomi" type="text" name="mg">
+      </div>
+      <button type="button" onclick="addMentorGroupInput()" style="font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;">+ Guruh qo'shish</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">DARS KUNLARI</label>
+      <select class="form-input" id="new-mentor-days">
+        <option value="juft">Juft kunlar (2,4,6)</option>
+        <option value="toq">Toq kunlar (1,3,5)</option>
+        <option value="harkuni">Har kuni</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">DARS SOATI</label>
+      <input class="form-input" id="new-mentor-time" type="time" value="09:00">
+    </div>
+    <button class="btn btn-primary" onclick="addMentor()">Mentor qo'shish</button>
+  </div>
+</div>
+
+<!-- ADD GROUP MODAL -->
+<div class="modal-overlay hidden" id="add-group-modal">
+  <div class="modal">
+    <div class="modal-title">👥 Guruh qo'shish <button class="modal-close" onclick="closeModal('add-group-modal')">✕</button></div>
+    <div class="form-group">
+      <label class="form-label">GURUH NOMI</label>
+      <input class="form-input" id="new-group-name" placeholder="Guruh nomi" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">KURS NOMI</label>
+      <input class="form-input" id="new-group-course" placeholder="Python, Django, React..." type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">BOSHLANISH SANASI</label>
+      <input class="form-input" id="new-group-start" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">TUGASH SANASI</label>
+      <input class="form-input" id="new-group-end" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">DARS KUNLARI</label>
+      <select class="form-input" id="new-group-days">
+        <option value="juft">Juft kunlar (2,4,6)</option>
+        <option value="toq">Toq kunlar (1,3,5)</option>
+        <option value="harkuni">Har kuni</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">DARS SOATI</label>
+      <input class="form-input" id="new-group-time" type="time" value="09:00">
+    </div>
+    <button class="btn btn-primary" onclick="addGroup()">Guruh qo'shish</button>
+  </div>
+</div>
+
+<!-- ADD EVENT MODAL -->
+<div class="modal-overlay hidden" id="add-event-modal">
+  <div class="modal">
+    <div class="modal-title">📅 Tadbir qo'shish <button class="modal-close" onclick="closeModal('add-event-modal')">✕</button></div>
+    <div class="form-group">
+      <label class="form-label">TADBIR NOMI</label>
+      <input class="form-input" id="new-event-name" placeholder="Tadbir nomi" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">SANA</label>
+      <input class="form-input" id="new-event-date" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">GURUH (ixtiyoriy)</label>
+      <select class="form-input" id="new-event-group">
+        <option value="">Hammaga</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="addEvent()">Qo'shish</button>
+  </div>
+</div>
+
+<!-- MENTOR GROUP DETAIL MODAL -->
+<div class="modal-overlay hidden" id="group-detail-modal" style="align-items:flex-start;padding-top:20px;">
+  <div class="modal" style="max-width:98vw;width:1200px;max-height:95vh;">
+    <div class="modal-title" id="group-detail-title">Guruh <button class="modal-close" onclick="closeModal('group-detail-modal')">✕</button></div>
+    <!-- TABS -->
+    <div class="task-tabs" style="margin-bottom:16px;">
+      <button class="task-tab active" onclick="switchGroupTab('tab-tasks')">📝 Vazifalar</button>
+      <button class="task-tab" onclick="switchGroupTab('tab-chat')">💬 Chat</button>
+      <button class="task-tab" onclick="switchGroupTab('tab-schedule')">📊 Jadval</button>
+      <button class="task-tab" onclick="switchGroupTab('tab-students')">👥 O'quvchilar</button>
+      <button class="task-tab" onclick="switchGroupTab('tab-reyting')">🏆 Reyting</button>
+    </div>
+    <!-- TASKS TAB -->
+    <div id="tab-tasks" class="tab-content active">
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn btn-primary btn-sm" onclick="openAddTaskModal('home')">+ Uyga vazifa</button>
+        <button class="btn btn-secondary btn-sm" onclick="openAddTaskModal('class')">+ Darsda vazifa</button>
+      </div>
+      <div class="task-tabs" style="margin-bottom:12px;">
+        <button class="task-tab active" onclick="switchMentorTaskTab('mt-home')">🏠 Uyga</button>
+        <button class="task-tab" onclick="switchMentorTaskTab('mt-class')">📖 Darsda</button>
+      </div>
+      <div id="mt-home" class="tab-content active"><div id="mentor-home-tasks"></div></div>
+      <div id="mt-class" class="tab-content"><div id="mentor-class-tasks"></div></div>
+    </div>
+    <!-- CHAT TAB -->
+    <div id="tab-chat" class="tab-content">
+      <div class="chat-messages" id="mentor-chat-messages"></div>
+      <div class="chat-input-wrap">
+        <input class="chat-input" id="mentor-chat-input" placeholder="Xabar yozing..." onkeydown="if(event.key==='Enter')sendMentorChat()">
+        <button class="btn btn-primary btn-sm" onclick="sendMentorChat()" style="width:auto;padding:10px 16px;">➤</button>
+      </div>
+    </div>
+    <!-- SCHEDULE TAB -->
+    <div id="tab-schedule" class="tab-content">
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="btn btn-secondary btn-sm" onclick="editScheduleMode()">✏️ Jadvalni tahrirlash</button>
+        <button class="btn btn-secondary btn-sm" onclick="refreshSchedule()">🔄 Yangilash</button>
+      </div>
+      <div class="schedule-table-wrap" id="schedule-table-container"></div>
+    </div>
+    <!-- STUDENTS TAB -->
+    <div id="tab-students" class="tab-content">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Ism Familya</th><th>Email</th><th>Telefon</th><th>Ball</th><th>Amallar</th></tr></thead>
+          <tbody id="group-students-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- REYTING TAB -->
+    <div id="tab-reyting" class="tab-content">
+      <div id="group-reyting"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TASK MODAL -->
+<div class="modal-overlay hidden" id="add-task-modal">
+  <div class="modal">
+    <div class="modal-title" id="add-task-title">Vazifa qo'shish <button class="modal-close" onclick="closeModal('add-task-modal')">✕</button></div>
+    <div class="form-group">
+      <label class="form-label">VAZIFA SARLAVHASI</label>
+      <input class="form-input" id="task-title-input" placeholder="Vazifa sarlavhasi" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label">VAZIFA SHARTI</label>
+      <textarea class="task-submit-area" id="task-desc-input" placeholder="Vazifa tavsifi va sharti..."></textarea>
+    </div>
+    <div id="deadline-section" class="form-group">
+      <label class="form-label">MUDDAT SANASI</label>
+      <input class="form-input" id="task-deadline-date" type="date">
+    </div>
+    <div id="deadline-time-section" class="form-group">
+      <label class="form-label">MUDDAT VAQTI</label>
+      <input class="form-input" id="task-deadline-time" type="time" value="23:00">
+    </div>
+    <div id="class-duration-section" class="form-group hidden">
+      <label class="form-label">VAQT (daqiqa)</label>
+      <input class="form-input" id="task-duration" type="number" value="5" min="1">
+    </div>
+    <button class="btn btn-primary" onclick="addTask()">Vazifa qo'shish</button>
+  </div>
+</div>
+
+<!-- TASK SUBMISSIONS MODAL -->
+<div class="modal-overlay hidden" id="submissions-modal">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-title" id="submissions-title">Javoblar <button class="modal-close" onclick="closeModal('submissions-modal')">✕</button></div>
+    <div id="submissions-list"></div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay hidden" id="confirm-modal">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-title" id="confirm-title">Tasdiqlash <button class="modal-close" onclick="closeModal('confirm-modal')">✕</button></div>
+    <p id="confirm-text" style="font-size:14px;color:var(--text2);margin-bottom:20px;"></p>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-danger" style="flex:1;" id="confirm-yes-btn">Ha</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('confirm-modal')">Yo'q</button>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT TASK SUBMIT MODAL -->
+<div class="modal-overlay hidden" id="submit-task-modal">
+  <div class="modal">
+    <div class="modal-title" id="submit-task-title">Vazifa yuborish <button class="modal-close" onclick="closeModal('submit-task-modal')">✕</button></div>
+    <div id="submit-task-desc" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--text2);line-height:1.6;"></div>
+    <div class="form-group">
+      <label class="form-label">JAVOBINGIZ</label>
+      <textarea class="task-submit-area" id="submit-answer" placeholder="Javobingizni yozing..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="submitTask()">Yuborish ➤</button>
+  </div>
+</div>
+
+<!-- MENTOR DELETE CONFIRM -->
+<div class="modal-overlay hidden" id="mentor-delete-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">⚠️ Mentor o'chirish <button class="modal-close" onclick="closeModal('mentor-delete-modal')">✕</button></div>
+    <div class="alert alert-warn" style="margin-bottom:16px;">
+      Bu mentorni o'chirish uning barcha ma'lumotlari bilan birga o'chadi!
+    </div>
+    <div id="delete-mentor-info" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
+    </div>
+    <div id="delete-mentor-alert" style="margin-bottom:8px;"></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Bu mentorni nofaol qilasizmi yoki to'liq o'chirasizmi?</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-danger btn-sm" id="full-delete-mentor-btn">🗑 To'liq o'chirish</button>
+      <button class="btn btn-secondary btn-sm" id="deactivate-mentor-btn">⏸ Nofaol qilish</button>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('mentor-delete-modal')">Bekor qilish</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCHEDULE EDIT MODAL -->
+<div class="modal-overlay hidden" id="schedule-edit-modal">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-title">✏️ Jadvalni tahrirlash <button class="modal-close" onclick="closeModal('schedule-edit-modal')">✕</button></div>
+    <div id="schedule-edit-content"></div>
+    <button class="btn btn-primary mt-4" onclick="saveScheduleEdit()">Saqlash</button>
+  </div>
+</div>
+
+<!-- SCORE EDIT MODAL -->
+<div class="modal-overlay hidden" id="score-edit-modal">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-title" id="score-edit-title">Ball tahrirlash <button class="modal-close" onclick="closeModal('score-edit-modal')">✕</button></div>
+    <div class="form-group">
+      <label class="form-label">BALL</label>
+      <input class="form-input" id="score-edit-input" type="number" min="0" max="100">
+    </div>
+    <button class="btn btn-primary" onclick="saveScoreEdit()">Saqlash</button>
+  </div>
+</div>
+
+<!-- ============================================
+     JAVASCRIPT
+============================================ -->
+<script>
+// ============================================================
+// DATABASE (IndexedDB)
+// ============================================================
+const DB_NAME = 'ustoz_yordamchi_db';
+const DB_VERSION = 1;
+let db;
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('users')) {
+        const users = d.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
+        users.createIndex('email', 'email', { unique: true });
+        users.createIndex('login', 'login', { unique: true });
+      }
+      if (!d.objectStoreNames.contains('mentors')) {
+        const mentors = d.createObjectStore('mentors', { keyPath: 'id', autoIncrement: true });
+        mentors.createIndex('phone', 'phone', { unique: true });
+      }
+      if (!d.objectStoreNames.contains('groups')) {
+        d.createObjectStore('groups', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!d.objectStoreNames.contains('tasks')) {
+        const tasks = d.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
+        tasks.createIndex('groupId', 'groupId', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('submissions')) {
+        const subs = d.createObjectStore('submissions', { keyPath: 'id', autoIncrement: true });
+        subs.createIndex('taskId', 'taskId', { unique: false });
+        subs.createIndex('userId', 'userId', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('messages')) {
+        const msgs = d.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        msgs.createIndex('groupId', 'groupId', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('events')) {
+        d.createObjectStore('events', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!d.objectStoreNames.contains('scores')) {
+        const sc = d.createObjectStore('scores', { keyPath: 'id', autoIncrement: true });
+        sc.createIndex('userId', 'userId', { unique: false });
+        sc.createIndex('groupId', 'groupId', { unique: false });
+      }
+    };
+    request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    request.onerror = reject;
+  });
+}
+
+function dbGet(store, id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    tx.objectStore(store).get(id).onsuccess = e => res(e.target.result);
+  });
+}
+function dbGetAll(store) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    tx.objectStore(store).getAll().onsuccess = e => res(e.target.result);
+  });
+}
+function dbGetByIndex(store, indexName, value) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    tx.objectStore(store).index(indexName).getAll(value).onsuccess = e => res(e.target.result);
+  });
+}
+function dbAdd(store, data) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).add(data);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = rej;
+  });
+}
+function dbPut(store, data) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).put(data);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = rej;
+  });
+}
+function dbDelete(store, id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(id).onsuccess = e => res();
+  });
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;
+let currentPanel = null;
+let currentOTP = null;
+let tempRegData = null;
+let currentGroupId = null;
+let currentTaskType = 'home';
+let submitTaskId = null;
+let scoreEditData = null;
+let editScheduleGroupId = null;
+
+// EmailJS config — REPLACE with your keys
+const EMAILJS_SERVICE = 'service_pa8gy9p'; // your emailjs service id
+const EMAILJS_TEMPLATE = 'template_yp24b9j'; // your emailjs template id
+const EMAILJS_PUBLIC = 'WBQT54zVVgzcv_3Nj'; // your emailjs public key
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  await initDB();
+  // Check if first run - seed admin (already hardcoded)
+  
+  // Check session
+  const session = sessionStorage.getItem('uy_session');
+  if (session) {
+    const s = JSON.parse(session);
+    currentUser = s;
+    showPanel(s.role);
+    return;
+  }
+  showAuthScreen();
+}
+
+function showAuthScreen() {
+  document.getElementById('auth-container').style.display = 'flex';
+  document.getElementById('admin-panel').style.display = 'none';
+  document.getElementById('mentor-panel').style.display = 'none';
+  document.getElementById('student-panel').style.display = 'none';
+  document.getElementById('admin-key-btn').style.display = 'flex';
+  showScreen('main-login');
+}
+
+function showPanel(role) {
+  document.getElementById('auth-container').style.display = 'none';
+  document.getElementById('admin-key-btn').style.display = 'none';
+  if (role === 'admin') {
+    document.getElementById('admin-panel').style.display = 'flex';
+    loadAdminDashboard();
+  } else if (role === 'mentor') {
+    document.getElementById('mentor-panel').style.display = 'flex';
+    loadMentorPanel();
+  } else {
+    document.getElementById('student-panel').style.display = 'flex';
+    loadStudentPanel();
+  }
+}
+
+function showScreen(name) {
+  const screens = ['main-login','mentor-login','student-login','register','forgot-password'];
+  screens.forEach(s => {
+    const el = document.getElementById(s + '-screen');
+    if(el) el.classList.add('hidden');
+  });
+  const target = document.getElementById(name + '-screen');
+  if(target) target.classList.remove('hidden');
+}
+
+// ============================================================
+// AUTH: ADMIN KEY
+// ============================================================
+function promptAdminKey() {
+  const pass = prompt('Admin paroli:');
+  if (pass === 'sonnet123') {
+    currentUser = { role: 'admin', name: 'Admin' };
+    sessionStorage.setItem('uy_session', JSON.stringify(currentUser));
+    showPanel('admin');
+  } else if (pass !== null) {
+    showToast('❌ Noto\'g\'ri parol', 'error');
+  }
+}
+
+// ============================================================
+// AUTH: MENTOR LOGIN
+// ============================================================
+async function mentorLogin() {
+  const phone = document.getElementById('mentor-phone').value.trim();
+  const pass = document.getElementById('mentor-pass').value.trim();
+  
+  setAlert('mentor-login-alert', '');
+  if (!phone || !pass) { setAlert('mentor-login-alert', 'Barcha maydonlarni to\'ldiring', 'error'); return; }
+  
+  const mentors = await dbGetAll('mentors');
+  const mentor = mentors.find(m => m.phone === phone && m.password === pass && m.active !== false);
+  
+  if (!mentor) {
+    setAlert('mentor-login-alert', 'Noto\'g\'ri telefon yoki parol, yoki mentor nofaol', 'error');
+    return;
+  }
+  
+  currentUser = { role: 'mentor', id: mentor.id, name: mentor.name, phone: mentor.phone };
+  sessionStorage.setItem('uy_session', JSON.stringify(currentUser));
+  showPanel('mentor');
+}
+
+// ============================================================
+// AUTH: STUDENT LOGIN
+// ============================================================
+async function studentLogin() {
+  const email = document.getElementById('student-email').value.trim();
+  const pass = document.getElementById('student-pass').value.trim();
+  
+  setAlert('student-login-alert', '');
+  if (!email || !pass) { setAlert('student-login-alert', 'Barcha maydonlarni to\'ldiring', 'error'); return; }
+  
+  const users = await dbGetAll('users');
+  const user = users.find(u => u.email === email && u.password === pass);
+  
+  if (!user) { setAlert('student-login-alert', 'Noto\'g\'ri email yoki parol', 'error'); return; }
+  
+  currentUser = { role: 'student', id: user.id, name: user.name, email: user.email, groupName: user.groupName };
+  sessionStorage.setItem('uy_session', JSON.stringify(currentUser));
+  showPanel('student');
+}
+
+// ============================================================
+// AUTH: REGISTER
+// ============================================================
+let tempRegOTP = null;
+
+function checkGroupName() {
+  const val = document.getElementById('reg-group').value.trim();
+  const msg = document.getElementById('group-check-msg');
+  if (val.length > 1) {
+    msg.style.color = 'var(--accent)';
+    msg.textContent = `✓ "${val}" guruhi tekshirilmoqda...`;
+  } else { msg.textContent = ''; }
+}
+
+async function registerStep1() {
+  const login = document.getElementById('reg-login').value.trim();
+  const name = document.getElementById('reg-name').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value.trim();
+  const group = document.getElementById('reg-group').value.trim();
+  
+  setAlert('register-alert', '');
+  
+  if (!login||!name||!phone||!email||!pass||!group) {
+    setAlert('register-alert', 'Barcha maydonlarni to\'ldiring', 'error'); return;
+  }
+  if (pass.length < 6) { setAlert('register-alert', 'Parol kamida 6 ta belgi bo\'lishi kerak', 'error'); return; }
+  
+  // Check existing email
+  const users = await dbGetAll('users');
+  const existing = users.find(u => u.email === email);
+  
+  tempRegData = { login, name, phone, email, pass, group };
+  
+  if (existing) {
+    document.getElementById('register-step-1').classList.add('hidden');
+    document.getElementById('register-step-existing').classList.remove('hidden');
+    return;
+  }
+  
+  // Check group exists
+  const groups = await dbGetAll('groups');
+  const grpExists = groups.find(g => g.name.toLowerCase() === group.toLowerCase());
+  if (!grpExists) {
+    setAlert('register-alert', `"${group}" guruh topilmadi! Iltimos, to'g'ri guruh nomini kiriting.`, 'warn');
+    return;
+  }
+  
+  // Send OTP
+  await sendOTP(email, name);
+  document.getElementById('reg-email-shown').textContent = email;
+  document.getElementById('register-step-1').classList.add('hidden');
+  document.getElementById('register-step-2').classList.remove('hidden');
+}
+
+async function sendOTP(email, name) {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  currentOTP = otp;
+  
+  // Try EmailJS
+  try {
+    emailjs.init(EMAILJS_PUBLIC);
+    await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+      to_email: email,
+      to_name: name,
+      otp_code: otp,
+      message: `Tasdiqlash kodingiz: ${otp}`
+    });
+    showToast(`📧 Kod ${email} ga yuborildi`, 'success');
+  } catch(e) {
+    // EmailJS not configured, show OTP in toast for demo
+    showToast(`🔑 Demo OTP: ${otp}`, 'success', 10000);
+  }
+  return otp;
+}
+
+async function verifyRegOTP() {
+  const entered = document.getElementById('reg-otp').value.trim();
+  if (entered !== currentOTP) {
+    setAlert('register-alert', 'Noto\'g\'ri kod! Qayta urinib ko\'ring.', 'error');
+    return;
+  }
+  
+  // Create user
+  const groups = await dbGetAll('groups');
+  const grp = groups.find(g => g.name.toLowerCase() === tempRegData.group.toLowerCase());
+  
+  await dbAdd('users', {
+    login: tempRegData.login,
+    name: tempRegData.name,
+    phone: tempRegData.phone,
+    email: tempRegData.email,
+    password: tempRegData.pass,
+    groupName: tempRegData.group,
+    groupId: grp ? grp.id : null,
+    createdAt: new Date().toISOString()
+  });
+  
+  showToast('✅ Ro\'yxatdan muvaffaqiyatli o\'tdingiz!', 'success');
+  showScreen('student-login');
+  document.getElementById('student-email').value = tempRegData.email;
+}
+
+async function resendOTP() {
+  if (tempRegData) await sendOTP(tempRegData.email, tempRegData.name);
+}
+
+async function loginExistingUser() {
+  showScreen('student-login');
+  document.getElementById('student-email').value = tempRegData.email;
+}
+
+async function deleteAndReregister() {
+  const users = await dbGetAll('users');
+  const existing = users.find(u => u.email === tempRegData.email);
+  if (existing) await dbDelete('users', existing.id);
+  
+  const otp = await sendOTP(tempRegData.email, tempRegData.name);
+  document.getElementById('reg-email-shown').textContent = tempRegData.email;
+  document.getElementById('register-step-existing').classList.add('hidden');
+  document.getElementById('register-step-2').classList.remove('hidden');
+}
+
+// ============================================================
+// AUTH: FORGOT PASSWORD
+// ============================================================
+let forgotOTP = null;
+let forgotUserEmail = null;
+
+async function forgotStep1() {
+  const email = document.getElementById('forgot-email').value.trim();
+  setAlert('forgot-alert', '');
+  if (!email) { setAlert('forgot-alert', 'Email kiriting', 'error'); return; }
+  
+  const users = await dbGetAll('users');
+  const user = users.find(u => u.email === email);
+  if (!user) { setAlert('forgot-alert', 'Bu email bilan foydalanuvchi topilmadi', 'error'); return; }
+  
+  forgotUserEmail = email;
+  forgotOTP = await sendOTP(email, user.name);
+  
+  document.getElementById('forgot-step-1').classList.add('hidden');
+  document.getElementById('forgot-step-2').classList.remove('hidden');
+}
+
+async function forgotVerifyOTP() {
+  const entered = document.getElementById('forgot-otp').value.trim();
+  if (entered !== forgotOTP) {
+    setAlert('forgot-alert', 'Noto\'g\'ri kod', 'error'); return;
+  }
+  
+  const users = await dbGetAll('users');
+  const user = users.find(u => u.email === forgotUserEmail);
+  
+  // Send credentials via email
+  try {
+    emailjs.init(EMAILJS_PUBLIC);
+    await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+      to_email: forgotUserEmail,
+      to_name: user.name,
+      message: `Login: ${user.login}\nParol: ${user.password}`
+    });
+  } catch(e) {
+    showToast(`Demo - Login: ${user.login} | Parol: ${user.password}`, 'success', 10000);
+  }
+  
+  document.getElementById('forgot-step-2').classList.add('hidden');
+  document.getElementById('forgot-step-3').classList.remove('hidden');
+}
+
+// ============================================================
+// ADMIN PANEL
+// ============================================================
+function adminNav(page) {
+  document.querySelectorAll('#admin-panel .nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`#admin-panel .nav-item[data-page="${page}"]`).classList.add('active');
+  document.querySelectorAll('#admin-main .page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`admin-page-${page}`).classList.add('active');
+  
+  if (page === 'dashboard') loadAdminDashboard();
+  else if (page === 'mentors') loadAdminMentors();
+  else if (page === 'groups') loadAdminGroups();
+  else if (page === 'students') loadAdminStudents();
+  else if (page === 'calendar-admin') loadAdminCalendar();
+}
+
+async function loadAdminDashboard() {
+  const users = await dbGetAll('users');
+  const mentors = await dbGetAll('mentors');
+  const groups = await dbGetAll('groups');
+  const activeMentors = mentors.filter(m => m.active !== false);
+  
+  document.getElementById('admin-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-icon">👨‍🎓</div>
+      <div class="stat-num">${users.length}</div>
+      <div class="stat-label">Jami o'quvchilar</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">👨‍💻</div>
+      <div class="stat-num">${activeMentors.length}</div>
+      <div class="stat-label">Faol mentorlar</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-num">${groups.length}</div>
+      <div class="stat-label">Jami guruhlar</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📊</div>
+      <div class="stat-num">${groups.filter(g=>g.active!==false).length}</div>
+      <div class="stat-label">Faol guruhlar</div>
+    </div>
+  `;
+  
+  const gl = document.getElementById('admin-groups-list');
+  gl.innerHTML = groups.length ? groups.map(g => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${g.name}</div>
+        <div style="font-size:11px;color:var(--text3);">${g.course || ''} · ${g.daysType || ''}</div>
+      </div>
+      <span class="badge ${g.active===false?'badge-red':'badge-green'}">${g.active===false?'Nofaol':'Faol'}</span>
+    </div>
+  `).join('') : '<div style="color:var(--text3);font-size:13px;">Guruhlar yo\'q</div>';
+  
+  const ml = document.getElementById('admin-mentors-list');
+  ml.innerHTML = mentors.length ? mentors.map(m => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${m.name}</div>
+        <div style="font-size:11px;color:var(--text3);">${m.phone}</div>
+      </div>
+      <span class="badge ${m.active===false?'badge-red':'badge-blue'}">${m.active===false?'Nofaol':'Faol'}</span>
+    </div>
+  `).join('') : '<div style="color:var(--text3);font-size:13px;">Mentorlar yo\'q</div>';
+}
+
+async function loadAdminMentors() {
+  const mentors = await dbGetAll('mentors');
+  const tbody = document.getElementById('mentors-tbody');
+  tbody.innerHTML = mentors.length ? mentors.map((m, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><strong>${m.name}</strong></td>
+      <td style="font-family:'JetBrains Mono';font-size:12px;">${m.phone}</td>
+      <td>${(m.groups||[]).join(', ') || '—'}</td>
+      <td><span class="badge ${m.active===false?'badge-red':'badge-green'}">${m.active===false?'Nofaol':'Faol'}</span></td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-icon btn-sm" onclick="openMentorDeleteModal(${m.id})">🗑</button>
+        </div>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);">Mentorlar yo\'q</td></tr>';
+}
+
+async function loadAdminGroups() {
+  const groups = await dbGetAll('groups');
+  const users = await dbGetAll('users');
+  const grid = document.getElementById('admin-groups-grid');
+  grid.innerHTML = groups.length ? groups.map(g => {
+    const count = users.filter(u => u.groupId === g.id).length;
+    return `
+    <div class="group-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">${g.name}</div>
+          <div style="font-size:12px;color:var(--text3);">${g.course || ''}</div>
+        </div>
+        <span class="badge badge-blue">${g.daysType||'har kuni'}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">
+        👨‍🎓 ${count} o'quvchi · ${g.classTime||''} 
+      </div>
+      <div style="font-size:12px;color:var(--text3);">
+        📅 ${g.startDate||''} → ${g.endDate||''}
+      </div>
+    </div>
+  `}).join('') : '<div style="color:var(--text3);">Guruhlar yo\'q</div>';
+}
+
+async function loadAdminStudents() {
+  const users = await dbGetAll('users');
+  const tbody = document.getElementById('students-tbody');
+  tbody.innerHTML = users.length ? users.map((u, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><strong>${u.name}</strong></td>
+      <td style="font-family:'JetBrains Mono';font-size:12px;">${u.login}</td>
+      <td>${u.email}</td>
+      <td>${u.phone}</td>
+      <td><span class="badge badge-blue">${u.groupName}</span></td>
+      <td style="font-size:11px;color:var(--text3);">${u.createdAt ? u.createdAt.slice(0,10) : ''}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);">O\'quvchilar yo\'q</td></tr>';
+}
+
+async function loadAdminCalendar() {
+  renderCalendar('admin-calendar', 'admin');
+  const events = await dbGetAll('events');
+  const el = document.getElementById('admin-events-list');
+  
+  // Populate group select
+  const groups = await dbGetAll('groups');
+  const sel = document.getElementById('new-event-group');
+  sel.innerHTML = '<option value="">Hammaga</option>' + groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+  
+  el.innerHTML = events.length ? events.map(ev => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${ev.name}</div>
+        <div style="font-size:11px;color:var(--text3);">${ev.date} ${ev.groupId?'· Guruh '+ev.groupId:''}</div>
+      </div>
+      <button class="btn btn-icon btn-sm" onclick="deleteEvent(${ev.id})">🗑</button>
+    </div>
+  `).join('') : '<div style="color:var(--text3);font-size:13px;">Tadbirlar yo\'q</div>';
+}
+
+// ============================================================
+// ADMIN: ADD MENTOR
+// ============================================================
+function openAddMentorModal() {
+  document.getElementById('add-mentor-modal').classList.remove('hidden');
+}
+
+function addMentorGroupInput() {
+  const container = document.getElementById('mentor-groups-inputs');
+  const inp = document.createElement('input');
+  inp.className = 'form-input';
+  inp.style.marginBottom = '8px';
+  inp.placeholder = 'Guruh nomi';
+  inp.type = 'text';
+  inp.name = 'mg';
+  container.appendChild(inp);
+}
+
+async function addMentor() {
+  const name = document.getElementById('new-mentor-name').value.trim();
+  const phone = document.getElementById('new-mentor-phone').value.trim();
+  const pass = document.getElementById('new-mentor-pass').value.trim();
+  const days = document.getElementById('new-mentor-days').value;
+  const time = document.getElementById('new-mentor-time').value;
+  
+  if (!name||!phone||!pass) { setAlert('add-mentor-alert', 'Barcha maydonlarni to\'ldiring', 'error'); return; }
+  
+  const groupInputs = document.querySelectorAll('#mentor-groups-inputs input[name="mg"]');
+  const groups = Array.from(groupInputs).map(i => i.value.trim()).filter(Boolean);
+  
+  try {
+    await dbAdd('mentors', { name, phone, password: pass, groups, daysType: days, classTime: time, active: true, createdAt: new Date().toISOString() });
+    
+    // Also create groups if they don't exist
+    const existingGroups = await dbGetAll('groups');
+    for (const gname of groups) {
+      if (!existingGroups.find(g => g.name === gname)) {
+        await dbAdd('groups', { name: gname, course: '', daysType: days, classTime: time, active: true, createdAt: new Date().toISOString() });
+      }
+    }
+    
+    showToast('✅ Mentor qo\'shildi', 'success');
+    closeModal('add-mentor-modal');
+    loadAdminMentors();
+    loadAdminDashboard();
+  } catch(e) {
+    setAlert('add-mentor-alert', 'Bu telefon raqam allaqachon mavjud!', 'error');
+  }
+}
+
+// ============================================================
+// ADMIN: ADD GROUP
+// ============================================================
+function openAddGroupModal() {
+  document.getElementById('add-group-modal').classList.remove('hidden');
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('new-group-start').value = today;
+  const end = new Date(); end.setMonth(end.getMonth()+3);
+  document.getElementById('new-group-end').value = end.toISOString().slice(0,10);
+}
+
+async function addGroup() {
+  const name = document.getElementById('new-group-name').value.trim();
+  const course = document.getElementById('new-group-course').value.trim();
+  const start = document.getElementById('new-group-start').value;
+  const end = document.getElementById('new-group-end').value;
+  const days = document.getElementById('new-group-days').value;
+  const time = document.getElementById('new-group-time').value;
+  
+  if (!name) { showToast('Guruh nomi kiriting', 'error'); return; }
+  
+  await dbAdd('groups', { name, course, startDate: start, endDate: end, daysType: days, classTime: time, active: true, createdAt: new Date().toISOString() });
+  showToast('✅ Guruh qo\'shildi', 'success');
+  closeModal('add-group-modal');
+  loadAdminGroups();
+}
+
+// ============================================================
+// ADMIN: CALENDAR EVENTS
+// ============================================================
+function openAddEventModal() {
+  document.getElementById('add-event-modal').classList.remove('hidden');
+  document.getElementById('new-event-date').value = new Date().toISOString().slice(0,10);
+}
+
+async function addEvent() {
+  const name = document.getElementById('new-event-name').value.trim();
+  const date = document.getElementById('new-event-date').value;
+  const groupId = document.getElementById('new-event-group').value;
+  if (!name||!date) { showToast('Ma\'lumotlarni to\'ldiring', 'error'); return; }
+  await dbAdd('events', { name, date, groupId: groupId ? parseInt(groupId) : null });
+  showToast('✅ Tadbir qo\'shildi', 'success');
+  closeModal('add-event-modal');
+  loadAdminCalendar();
+}
+
+async function deleteEvent(id) {
+  await dbDelete('events', id);
+  showToast('O\'chirildi', 'success');
+  loadAdminCalendar();
+}
+
+// ============================================================
+// ADMIN: MENTOR DELETE
+// ============================================================
+async function openMentorDeleteModal(mentorId) {
+  const mentor = await dbGet('mentors', mentorId);
+  document.getElementById('delete-mentor-info').innerHTML = `
+    <div style="font-weight:600;">${mentor.name}</div>
+    <div style="font-size:12px;color:var(--text3);">${mentor.phone} · ${(mentor.groups||[]).join(', ')}</div>
+  `;
+  document.getElementById('mentor-delete-modal').classList.remove('hidden');
+  
+  document.getElementById('full-delete-mentor-btn').onclick = async () => {
+    await dbDelete('mentors', mentorId);
+    showToast('Mentor o\'chirildi', 'success');
+    closeModal('mentor-delete-modal');
+    loadAdminMentors();
+    loadAdminDashboard();
+  };
+  
+  document.getElementById('deactivate-mentor-btn').onclick = async () => {
+    mentor.active = false;
+    await dbPut('mentors', mentor);
+    showToast('Mentor nofaol qilindi', 'success');
+    closeModal('mentor-delete-modal');
+    loadAdminMentors();
+  };
+}
+
+// ============================================================
+// MENTOR PANEL
+// ============================================================
+async function loadMentorPanel() {
+  const mentor = await dbGet('mentors', currentUser.id);
+  if (!mentor) return;
+  
+  document.getElementById('mentor-sidebar-name').textContent = mentor.name;
+  document.getElementById('mentor-sidebar-name2').textContent = mentor.name;
+  document.getElementById('mentor-welcome').textContent = `Salom, ${mentor.name}!`;
+  
+  // Set avatar initial
+  const initial = mentor.name.charAt(0).toUpperCase();
+  document.querySelector('#mentor-panel .user-avatar').textContent = initial;
+  
+  loadMentorDashboard();
+}
+
+async function loadMentorDashboard() {
+  const mentor = await dbGet('mentors', currentUser.id);
+  const allGroups = await dbGetAll('groups');
+  const myGroupNames = mentor.groups || [];
+  const myGroups = allGroups.filter(g => myGroupNames.includes(g.name));
+  
+  const users = await dbGetAll('users');
+  let totalStudents = 0;
+  myGroups.forEach(g => {
+    totalStudents += users.filter(u => u.groupId === g.id).length;
+  });
+  
+  const tasks = await dbGetAll('tasks');
+  const myTasks = tasks.filter(t => myGroups.find(g => g.id === t.groupId));
+  
+  document.getElementById('mentor-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-icon">👨‍🎓</div>
+      <div class="stat-num">${totalStudents}</div>
+      <div class="stat-label">Jami o'quvchilar</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-num">${myGroups.length}</div>
+      <div class="stat-label">Guruhlarim</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📝</div>
+      <div class="stat-num">${myTasks.length}</div>
+      <div class="stat-label">Jami vazifalar</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-num">${myTasks.filter(t=>isDeadlineActive(t)).length}</div>
+      <div class="stat-label">Faol vazifalar</div>
+    </div>
+  `;
+  
+  const mgl = document.getElementById('mentor-my-groups');
+  mgl.innerHTML = myGroups.length ? myGroups.map(g => {
+    const cnt = users.filter(u => u.groupId === g.id).length;
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;" onclick="openGroupDetail(${g.id})">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${g.name}</div>
+        <div style="font-size:11px;color:var(--text3);">${g.course||''} · ${cnt} o'quvchi</div>
+      </div>
+      <button class="btn btn-primary btn-sm">Kirish →</button>
+    </div>
+  `}).join('') : '<div style="color:var(--text3);font-size:13px;">Guruhlar yo\'q</div>';
+  
+  renderCalendar('mentor-calendar', 'mentor');
+}
+
+function mentorNav(page) {
+  document.querySelectorAll('#mentor-panel .nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`#mentor-panel .nav-item[data-page="${page}"]`).classList.add('active');
+  document.querySelectorAll('#mentor-main .page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`mentor-page-${page}`).classList.add('active');
+  
+  if (page === 'm-dashboard') loadMentorDashboard();
+  else if (page === 'm-groups') loadMentorGroups();
+}
+
+async function loadMentorGroups() {
+  const mentor = await dbGet('mentors', currentUser.id);
+  const allGroups = await dbGetAll('groups');
+  const myGroupNames = mentor.groups || [];
+  const myGroups = allGroups.filter(g => myGroupNames.includes(g.name));
+  
+  const container = document.getElementById('mentor-groups-content');
+  const users = await dbGetAll('users');
+  
+  container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">` +
+    myGroups.map(g => {
+      const cnt = users.filter(u => u.groupId === g.id).length;
+      return `
+      <div class="group-card" style="cursor:pointer;" onclick="openGroupDetail(${g.id})">
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px;">${g.name}</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">${g.course||''}</div>
+        <div style="font-size:12px;color:var(--text3);">👨‍🎓 ${cnt} o'quvchi</div>
+        <div style="font-size:12px;color:var(--text3);">📅 ${g.daysType||''} · ${g.classTime||''}</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:14px;width:100%;">Guruhga kirish →</button>
+      </div>
+    `}).join('') + '</div>';
+}
+
+// ============================================================
+// GROUP DETAIL (MENTOR)
+// ============================================================
+async function openGroupDetail(groupId) {
+  currentGroupId = groupId;
+  const group = await dbGet('groups', groupId);
+  document.getElementById('group-detail-title').innerHTML = `👥 ${group.name} <button class="modal-close" onclick="closeModal('group-detail-modal')">✕</button>`;
+  document.getElementById('group-detail-modal').classList.remove('hidden');
+  
+  // Reset tabs
+  document.querySelectorAll('#group-detail-modal .task-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#group-detail-modal .tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector('#group-detail-modal .task-tab').classList.add('active');
+  document.getElementById('tab-tasks').classList.add('active');
+  
+  loadGroupTasks();
+  loadGroupStudents();
+  loadGroupChat();
+  loadGroupSchedule();
+  loadGroupReyting();
+}
+
+function switchGroupTab(tabId) {
+  document.querySelectorAll('#group-detail-modal .task-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#group-detail-modal .tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+function switchMentorTaskTab(tabId) {
+  document.querySelectorAll('#tab-tasks .task-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#tab-tasks .tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+// ============================================================
+// GROUP TASKS (MENTOR)
+// ============================================================
+function openAddTaskModal(type) {
+  currentTaskType = type;
+  const title = type === 'home' ? 'Uyga vazifa qo\'shish' : 'Darsda vazifa qo\'shish';
+  document.getElementById('add-task-title').innerHTML = `📝 ${title} <button class="modal-close" onclick="closeModal('add-task-modal')">✕</button>`;
+  
+  if (type === 'class') {
+    document.getElementById('deadline-section').classList.add('hidden');
+    document.getElementById('deadline-time-section').classList.add('hidden');
+    document.getElementById('class-duration-section').classList.remove('hidden');
+  } else {
+    document.getElementById('deadline-section').classList.remove('hidden');
+    document.getElementById('deadline-time-section').classList.remove('hidden');
+    document.getElementById('class-duration-section').classList.add('hidden');
+    document.getElementById('task-deadline-date').value = new Date().toISOString().slice(0,10);
+  }
+  
+  document.getElementById('task-title-input').value = '';
+  document.getElementById('task-desc-input').value = '';
+  document.getElementById('add-task-modal').classList.remove('hidden');
+}
+
+async function addTask() {
+  const title = document.getElementById('task-title-input').value.trim();
+  const desc = document.getElementById('task-desc-input').value.trim();
+  
+  if (!title || !desc) { showToast('Sarlavha va shartni kiriting', 'error'); return; }
+  
+  let deadline = null;
+  let duration = null;
+  
+  if (currentTaskType === 'home') {
+    const date = document.getElementById('task-deadline-date').value;
+    const time = document.getElementById('task-deadline-time').value;
+    deadline = `${date} ${time}`;
+  } else {
+    duration = parseInt(document.getElementById('task-duration').value) || 5;
+  }
+  
+  const task = {
+    title, desc, type: currentTaskType,
+    groupId: currentGroupId,
+    deadline, duration,
+    mentorId: currentUser.id,
+    createdAt: new Date().toISOString(),
+    active: true,
+    closedAt: currentTaskType === 'class' ? null : null
+  };
+  
+  // Auto-close class tasks after duration
+  const taskId = await dbAdd('tasks', task);
+  
+  if (currentTaskType === 'class') {
+    const ms = (duration || 5) * 60 * 1000;
+    setTimeout(async () => {
+      const t = await dbGet('tasks', taskId);
+      if (t) { t.active = false; await dbPut('tasks', t); }
+    }, ms);
+  }
+  
+  showToast('✅ Vazifa qo\'shildi', 'success');
+  closeModal('add-task-modal');
+  loadGroupTasks();
+  loadGroupSchedule();
+}
+
+async function loadGroupTasks() {
+  const tasks = await dbGetAll('tasks');
+  const groupTasks = tasks.filter(t => t.groupId === currentGroupId);
+  
+  const homeTasks = groupTasks.filter(t => t.type === 'home');
+  const classTasks = groupTasks.filter(t => t.type === 'class');
+  
+  const renderTask = (t) => {
+    const isActive = isDeadlineActive(t);
+    return `
+    <div class="task-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:14px;">${t.title}</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          ${isActive ? '<span class="badge badge-green">Faol</span>' : '<span class="badge badge-red">Yopilgan</span>'}
+          <button class="btn btn-icon btn-sm" onclick="deleteTask(${t.id})" title="O'chirish">🗑</button>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.5;">${t.desc}</div>
+      ${t.deadline ? `<div style="font-size:12px;color:var(--text3);">⏰ Muddat: ${t.deadline}</div>` : ''}
+      ${t.duration ? `<div style="font-size:12px;color:var(--text3);">⏱ Vaqt: ${t.duration} daqiqa</div>` : ''}
+      <div style="margin-top:10px;">
+        <button class="btn btn-secondary btn-sm" onclick="openSubmissions(${t.id})">📋 Javoblar</button>
+      </div>
+    </div>
+  `};
+  
+  document.getElementById('mentor-home-tasks').innerHTML = homeTasks.length ? homeTasks.map(renderTask).join('') : '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Uyga vazifalar yo\'q</div>';
+  document.getElementById('mentor-class-tasks').innerHTML = classTasks.length ? classTasks.map(renderTask).join('') : '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Darsda vazifalar yo\'q</div>';
+}
+
+async function deleteTask(taskId) {
+  await dbDelete('tasks', taskId);
+  showToast('Vazifa o\'chirildi', 'success');
+  loadGroupTasks();
+  loadGroupSchedule();
+}
+
+// ============================================================
+// TASK SUBMISSIONS
+// ============================================================
+async function openSubmissions(taskId) {
+  const task = await dbGet('tasks', taskId);
+  const submissions = await dbGetByIndex('submissions', 'taskId', taskId);
+  const users = await dbGetAll('users');
+  
+  document.getElementById('submissions-title').innerHTML = `📋 "${task.title}" — Javoblar <button class="modal-close" onclick="closeModal('submissions-modal')">✕</button>`;
+  
+  document.getElementById('submissions-list').innerHTML = submissions.length ? 
+    submissions.map(s => {
+      const user = users.find(u => u.id === s.userId);
+      return `
+      <div class="submission-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div style="font-weight:600;font-size:13px;">${user ? user.name : 'O\'quvchi'}</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:11px;color:var(--text3);">${s.submittedAt ? s.submittedAt.slice(0,16).replace('T',' ') : ''}</div>
+            <input class="score-input" type="number" min="0" max="100" value="${s.score||''}" placeholder="Ball" onchange="updateSubmissionScore(${s.id}, this.value, ${s.userId}, ${task.groupId})">
+          </div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;line-height:1.6;color:var(--text2);">${s.answer}</div>
+        ${s.aiComment ? `<div class="ai-response">${s.aiComment}</div>` : `<button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="aiReview(${s.id})">🤖 AI bilan tekshirish</button>`}
+      </div>
+    `}).join('') : '<div style="color:var(--text3);text-align:center;padding:30px;">Hali javob yo\'q</div>';
+  
+  document.getElementById('submissions-modal').classList.remove('hidden');
+}
+
+async function updateSubmissionScore(subId, score, userId, groupId) {
+  const sub = await dbGet('submissions', subId);
+  if (sub) {
+    sub.score = parseInt(score) || 0;
+    await dbPut('submissions', sub);
+    
+    // Update score record
+    const scores = await dbGetAll('scores');
+    const existing = scores.find(s => s.submissionId === subId);
+    if (existing) {
+      existing.score = sub.score;
+      await dbPut('scores', existing);
+    } else {
+      await dbAdd('scores', { userId, groupId, submissionId: subId, taskId: sub.taskId, score: sub.score, date: new Date().toISOString() });
+    }
+    showToast('Ball saqlandi', 'success');
+    loadGroupReyting();
+  }
+}
+
+async function aiReview(subId) {
+  const sub = await dbGet('submissions', subId);
+  const task = await dbGet('tasks', sub.taskId);
+  
+  showToast('🤖 AI tekshirayapti...', 'success');
+  
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `Sen IT dasturlash kursi mentorining yordamchisisan. O'quvchi quyidagi vazifani bajargan. Baholash va fikr bildir.\n\nVazifa: ${task.title}\nVazifa sharti: ${task.desc}\n\nO'quvchi javobi: ${sub.answer}\n\nUzbek tilida qisqacha baholash ber va qaysi joylarni yaxshilash kerakligini ko'rsat. Maksimal 150 so'z.`
+        }]
+      })
+    });
+    const data = await response.json();
+    const comment = data.content?.[0]?.text || 'AI javobi olinmadi';
+    sub.aiComment = comment;
+    await dbPut('submissions', sub);
+    openSubmissions(sub.taskId);
+  } catch(e) {
+    showToast('AI ga ulanishda xatolik', 'error');
+  }
+}
+
+// ============================================================
+// GROUP CHAT
+// ============================================================
+async function loadGroupChat() {
+  const messages = await dbGetByIndex('messages', 'groupId', currentGroupId);
+  const users = await dbGetAll('users');
+  const mentors = await dbGetAll('mentors');
+  
+  renderChatMessages('mentor-chat-messages', messages, users, mentors);
+}
+
+function renderChatMessages(containerId, messages, users, mentors) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  const isStudent = currentUser.role === 'student';
+  const myId = currentUser.id;
+  
+  container.innerHTML = messages.map(m => {
+    const isMine = (m.senderType === currentUser.role && m.senderId === myId);
+    let senderName = 'Noma\'lum';
+    if (m.senderType === 'mentor') {
+      const mentor = mentors.find(me => me.id === m.senderId);
+      senderName = mentor ? mentor.name : 'Mentor';
+    } else {
+      const user = users.find(u => u.id === m.senderId);
+      senderName = user ? user.name : 'O\'quvchi';
+    }
+    
+    return `
+    <div class="chat-msg ${isMine ? 'mine' : 'other'}">
+      ${!isMine ? `<div style="font-size:10px;font-weight:700;margin-bottom:4px;opacity:0.7;">${senderName}</div>` : ''}
+      ${m.text}
+      <div class="chat-msg-meta">${m.createdAt ? m.createdAt.slice(11,16) : ''}</div>
+    </div>
+  `}).join('');
+  
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendMentorChat() {
+  const input = document.getElementById('mentor-chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  
+  await dbAdd('messages', {
+    groupId: currentGroupId,
+    senderId: currentUser.id,
+    senderType: 'mentor',
+    text,
+    createdAt: new Date().toISOString()
+  });
+  
+  input.value = '';
+  loadGroupChat();
+}
+
+// ============================================================
+// GROUP SCHEDULE (JADVAL)
+// ============================================================
+async function loadGroupSchedule() {
+  const group = await dbGet('groups', currentGroupId);
+  const users = await dbGetAll('users');
+  const students = users.filter(u => u.groupId === currentGroupId);
+  const tasks = await dbGetAll('tasks');
+  const groupTasks = tasks.filter(t => t.groupId === currentGroupId);
+  const submissions = await dbGetAll('submissions');
+  const scores = await dbGetAll('scores');
+  
+  // Generate class dates
+  const classDates = generateClassDates(group);
+  
+  renderScheduleTable('schedule-table-container', group, students, classDates, groupTasks, submissions, scores, false);
+}
+
+function generateClassDates(group) {
+  if (!group.startDate || !group.endDate) return [];
+  const start = new Date(group.startDate);
+  const end = new Date(group.endDate);
+  const dates = [];
+  const cur = new Date(start);
+  
+  while (cur <= end) {
+    const day = cur.getDay(); // 0=Sun, 1=Mon...6=Sat
+    let include = false;
+    if (group.daysType === 'juft') include = [1,3,5].includes(day); // Mon,Wed,Fri
+    else if (group.daysType === 'toq') include = [2,4,6].includes(day); // Tue,Thu,Sat
+    else include = day !== 0; // harkuni except Sunday
+    
+    if (include) dates.push(cur.toISOString().slice(0,10));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+function renderScheduleTable(containerId, group, students, classDates, tasks, submissions, scores, editMode) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  const displayDates = classDates.slice(0, 30); // show max 30 dates
+  
+  let html = `<table class="schedule-table"><thead>`;
+  // Row 1: Students header + dates
+  html += `<tr><th rowspan="2" style="min-width:150px;">O'quvchi</th>`;
+  displayDates.forEach(d => {
+    const dateObj = new Date(d);
+    const dayNames = ['Yak','Du','Se','Ch','Pa','Ju','Sh'];
+    html += `<th style="text-align:center;">${formatDateShort(d)}<br><span style="color:var(--text3);font-size:10px;">${dayNames[dateObj.getDay()]}</span></th>`;
+  });
+  html += `<th>Jami ball</th></tr>`;
+  
+  // Row 2: Task add buttons per date
+  html += `<tr>`;
+  displayDates.forEach(d => {
+    const dayTask = tasks.find(t => t.deadline && t.deadline.startsWith(d) || t.createdAt && t.createdAt.startsWith(d));
+    html += `<th style="text-align:center;"><span class="schedule-add-task" onclick="addTaskForDate('${d}')">+ vazifa</span></th>`;
+  });
+  html += `<th></th></tr>`;
+  
+  // Row 3: "bot" row
+  html += `<tr><td class="student-name" style="color:var(--text3);font-style:italic;">Bot</td>`;
+  displayDates.forEach(d => { html += `<td style="text-align:center;color:var(--text3);font-size:11px;">bot</td>`; });
+  html += `<td></td></tr>`;
+  
+  // Student rows
+  students.forEach(student => {
+    const studentScores = scores.filter(s => s.userId === student.id && s.groupId === group.id);
+    const totalScore = studentScores.reduce((sum, s) => sum + (s.score || 0), 0);
+    
+    html += `<tr><td class="student-name">${student.name}</td>`;
+    
+    displayDates.forEach(d => {
+      // Find task for this date
+      const dayTasks = tasks.filter(t => {
+        if (t.deadline) return t.deadline.startsWith(d);
+        if (t.createdAt) return t.createdAt.startsWith(d);
+        return false;
+      });
+      
+      if (dayTasks.length === 0) {
+        html += `<td style="text-align:center;">—</td>`;
+        return;
+      }
+      
+      const task = dayTasks[0];
+      const sub = submissions.find(s => s.taskId === task.id && s.userId === student.id);
+      const sc = sub ? scores.find(s => s.submissionId === sub.id) : null;
+      
+      if (sub) {
+        html += `<td style="text-align:center;"><span class="schedule-cell-done" onclick="viewStudentSub(${sub.id})">✓ ${sc ? sc.score + 'b' : ''}</span></td>`;
+      } else {
+        html += `<td style="text-align:center;"><span class="schedule-cell-miss">—</span></td>`;
+      }
+    });
+    
+    html += `<td style="text-align:center;"><strong class="schedule-cell-score">${totalScore}</strong>
+      ${editMode ? `<button class="btn btn-icon btn-sm" onclick="openScoreEdit(${student.id}, ${group.id}, ${totalScore})" style="margin-left:6px;">✏️</button>` : ''}
+    </td></tr>`;
+  });
+  
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+async function addTaskForDate(date) {
+  currentTaskType = 'home';
+  document.getElementById('add-task-title').innerHTML = `📝 ${date} uchun vazifa qo'shish <button class="modal-close" onclick="closeModal('add-task-modal')">✕</button>`;
+  document.getElementById('deadline-section').classList.remove('hidden');
+  document.getElementById('deadline-time-section').classList.remove('hidden');
+  document.getElementById('class-duration-section').classList.add('hidden');
+  document.getElementById('task-deadline-date').value = date;
+  document.getElementById('task-title-input').value = '';
+  document.getElementById('task-desc-input').value = '';
+  document.getElementById('add-task-modal').classList.remove('hidden');
+}
+
+async function viewStudentSub(subId) {
+  const sub = await dbGet('submissions', subId);
+  alert(`Javob:\n\n${sub.answer}`);
+}
+
+function refreshSchedule() {
+  loadGroupSchedule();
+  showToast('Jadval yangilandi', 'success');
+}
+
+function editScheduleMode() {
+  editScheduleGroupId = currentGroupId;
+  document.getElementById('schedule-edit-modal').classList.remove('hidden');
+  document.getElementById('schedule-edit-content').innerHTML = `
+    <div class="alert alert-info">Jadvalni tahrirlash — O'quvchi balllarini o'zgartirish uchun jadvaldan foydalaning.</div>
+    <p style="font-size:13px;color:var(--text2);">Jadval tahrirlash rejimi faollashtirish uchun "Saqlash" ni bosing.</p>
+  `;
+}
+
+function saveScheduleEdit() {
+  closeModal('schedule-edit-modal');
+  loadGroupSchedule();
+  showToast('Jadval saqlandi', 'success');
+}
+
+// ============================================================
+// SCORE EDIT
+// ============================================================
+function openScoreEdit(userId, groupId, current) {
+  scoreEditData = { userId, groupId };
+  document.getElementById('score-edit-input').value = current;
+  document.getElementById('score-edit-modal').classList.remove('hidden');
+}
+
+async function saveScoreEdit() {
+  const score = parseInt(document.getElementById('score-edit-input').value) || 0;
+  if (!scoreEditData) return;
+  
+  const scores = await dbGetAll('scores');
+  const existing = scores.find(s => s.userId === scoreEditData.userId && s.groupId === scoreEditData.groupId && !s.submissionId);
+  
+  if (existing) {
+    existing.score = score;
+    await dbPut('scores', existing);
+  } else {
+    await dbAdd('scores', { ...scoreEditData, score, date: new Date().toISOString() });
+  }
+  
+  closeModal('score-edit-modal');
+  loadGroupSchedule();
+  loadGroupReyting();
+  showToast('Ball yangilandi', 'success');
+}
+
+// ============================================================
+// GROUP STUDENTS
+// ============================================================
+async function loadGroupStudents() {
+  const users = await dbGetAll('users');
+  const students = users.filter(u => u.groupId === currentGroupId);
+  const scores = await dbGetAll('scores');
+  
+  const tbody = document.getElementById('group-students-tbody');
+  tbody.innerHTML = students.length ? students.map((s, i) => {
+    const total = scores.filter(sc => sc.userId === s.id && sc.groupId === currentGroupId).reduce((sum, sc) => sum + (sc.score || 0), 0);
+    return `
+    <tr>
+      <td>${i+1}</td>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.email}</td>
+      <td>${s.phone}</td>
+      <td><strong class="schedule-cell-score">${total}</strong></td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="removeStudentFromGroup(${s.id})">Guruhdan chiqarish</button>
+      </td>
+    </tr>
+  `}).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);">O\'quvchilar yo\'q</td></tr>';
+}
+
+async function removeStudentFromGroup(userId) {
+  const user = await dbGet('users', userId);
+  if (!user) return;
+  user.groupId = null;
+  user.groupName = '';
+  await dbPut('users', user);
+  showToast('O\'quvchi guruhdan chiqarildi', 'success');
+  loadGroupStudents();
+  loadGroupReyting();
+  loadGroupSchedule();
+}
+
+// ============================================================
+// GROUP REYTING
+// ============================================================
+async function loadGroupReyting() {
+  const users = await dbGetAll('users');
+  const students = users.filter(u => u.groupId === currentGroupId);
+  const scores = await dbGetAll('scores');
+  
+  const ranked = students.map(s => {
+    const total = scores.filter(sc => sc.userId === s.id && sc.groupId === currentGroupId).reduce((sum, sc) => sum + (sc.score || 0), 0);
+    return { ...s, total };
+  }).sort((a, b) => b.total - a.total);
+  
+  const container = document.getElementById('group-reyting');
+  container.innerHTML = ranked.length ? `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>O'rin</th><th>O'quvchi</th><th>Jami ball</th><th>Holat</th></tr></thead>
+        <tbody>
+          ${ranked.map((s, i) => `
+          <tr>
+            <td>
+              ${i < 3 ? `<span class="reyting-num reyting-${i+1}">${i+1}</span>` : `<span style="color:var(--text3);font-size:13px;">${i+1}</span>`}
+            </td>
+            <td><strong>${s.name}</strong></td>
+            <td><span class="schedule-cell-score" style="font-size:16px;">${s.total}</span></td>
+            <td>
+              ${i === 0 ? '🥇 Birinchi' : i === 1 ? '🥈 Ikkinchi' : i === 2 ? '🥉 Uchinchi' : ''}
+            </td>
+          </tr>
+        `).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : '<div style="color:var(--text3);text-align:center;padding:30px;">O\'quvchilar yo\'q</div>';
+}
+
+// ============================================================
+// STUDENT PANEL
+// ============================================================
+async function loadStudentPanel() {
+  const user = await dbGet('users', currentUser.id);
+  if (!user) return;
+  
+  document.getElementById('student-sidebar-name').textContent = user.name;
+  document.getElementById('student-name-sidebar').textContent = user.name;
+  document.getElementById('student-group-sidebar').textContent = user.groupName || 'Guruh';
+  document.getElementById('student-welcome').textContent = `Salom, ${user.name.split(' ')[0]}!`;
+  document.getElementById('student-avatar-sidebar').textContent = user.name.charAt(0).toUpperCase();
+  
+  if (user.groupId) {
+    const group = await dbGet('groups', user.groupId);
+    if (group) document.getElementById('student-chat-group-name').textContent = group.name + ' guruh chati';
+  }
+  
+  loadStudentDashboard();
+}
+
+async function loadStudentDashboard() {
+  const user = await dbGet('users', currentUser.id);
+  const tasks = await dbGetAll('tasks');
+  const myGroupTasks = tasks.filter(t => t.groupId === user.groupId);
+  const submissions = await dbGetAll('submissions');
+  const mySubmissions = submissions.filter(s => s.userId === currentUser.id);
+  const scores = await dbGetAll('scores');
+  const myTotal = scores.filter(s => s.userId === currentUser.id).reduce((sum, s) => sum + (s.score || 0), 0);
+  
+  const pending = myGroupTasks.filter(t => isDeadlineActive(t) && !mySubmissions.find(s => s.taskId === t.id));
+  
+  document.getElementById('student-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-icon">📝</div>
+      <div class="stat-num">${myGroupTasks.length}</div>
+      <div class="stat-label">Jami vazifalar</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-num">${pending.length}</div>
+      <div class="stat-label">Kutilmoqda</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-num">${mySubmissions.length}</div>
+      <div class="stat-label">Bajarilgan</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏆</div>
+      <div class="stat-num">${myTotal}</div>
+      <div class="stat-label">Jami ball</div>
+    </div>
+  `;
+  
+  // Activity
+  const actEl = document.getElementById('student-activity');
+  const recent = mySubmissions.slice(-5).reverse();
+  actEl.innerHTML = recent.length ? recent.map(s => {
+    const task = tasks.find(t => t.id === s.taskId);
+    const sc = scores.find(sc => sc.submissionId === s.id);
+    return `
+    <div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid var(--border);">
+      <div style="font-size:13px;">${task ? task.title : 'Vazifa'}</div>
+      ${sc ? `<span class="badge badge-green">${sc.score} ball</span>` : '<span class="badge badge-orange">Baholanmagan</span>'}
+    </div>
+  `}).join('') : '<div style="color:var(--text3);font-size:13px;padding:10px;">Faollik yo\'q</div>';
+  
+  renderCalendar('student-calendar', 'student');
+}
+
+function studentNav(page) {
+  document.querySelectorAll('#student-panel .nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`#student-panel .nav-item[data-page="${page}"]`).classList.add('active');
+  document.querySelectorAll('#student-main .page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`student-page-${page}`).classList.add('active');
+  
+  if (page === 's-dashboard') loadStudentDashboard();
+  else if (page === 's-tasks') loadStudentTasks();
+  else if (page === 's-chat') loadStudentChat();
+  else if (page === 's-profile') loadStudentProfile();
+}
+
+async function loadStudentTasks() {
+  const user = await dbGet('users', currentUser.id);
+  if (!user || !user.groupId) {
+    document.getElementById('home-tasks').innerHTML = '<div style="color:var(--text3);">Guruhga biriktirilmagansiz</div>';
+    return;
+  }
+  
+  const tasks = await dbGetAll('tasks');
+  const groupTasks = tasks.filter(t => t.groupId === user.groupId);
+  const homeTasks = groupTasks.filter(t => t.type === 'home');
+  const classTasks = groupTasks.filter(t => t.type === 'class');
+  const submissions = await dbGetAll('submissions');
+  const scores = await dbGetAll('scores');
+  
+  const renderStudentTask = (t) => {
+    const mySubmission = submissions.find(s => s.taskId === t.id && s.userId === currentUser.id);
+    const sc = mySubmission ? scores.find(s => s.submissionId === mySubmission.id) : null;
+    const isActive = isDeadlineActive(t);
+    
+    return `
+    <div class="task-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:14px;">${t.title}</div>
+        <div style="display:flex;gap:6px;">
+          ${mySubmission ? '<span class="badge badge-green">✓ Bajarilgan</span>' : isActive ? '<span class="badge badge-orange">Kutilmoqda</span>' : '<span class="badge badge-red">Yopilgan</span>'}
+          ${sc ? `<span class="badge badge-blue">${sc.score} ball</span>` : ''}
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.5;">${t.desc.slice(0,150)}${t.desc.length>150?'...':''}</div>
+      ${t.deadline ? `<div style="font-size:12px;color:var(--text3);margin-bottom:10px;">⏰ Muddat: ${t.deadline}</div>` : ''}
+      ${t.duration ? `<div style="font-size:12px;color:var(--text3);margin-bottom:10px;">⏱ Vaqt: ${t.duration} daqiqa</div>` : ''}
+      ${mySubmission ? `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;color:var(--text2);">
+          <strong>Javobingiz:</strong><br>${mySubmission.answer.slice(0,200)}
+        </div>
+        ${mySubmission.aiComment ? `<div class="ai-response" style="font-size:12px;">${mySubmission.aiComment}</div>` : ''}
+      ` : isActive ? `
+        <button class="btn btn-primary btn-sm" onclick="openSubmitModal(${t.id})">Javob yuborish ➤</button>
+      ` : '<div style="color:var(--red);font-size:12px;">Muddat tugagan, javob qabul qilinmaydi</div>'}
+    </div>
+  `};
+  
+  // Tabs with counts
+  document.querySelector('#student-page-s-tasks .task-tabs').innerHTML = `
+    <button class="task-tab active" onclick="switchTaskTab('home-tasks')">🏠 Uyga vazifalar (${homeTasks.length})</button>
+    <button class="task-tab" onclick="switchTaskTab('class-tasks')">📖 Darsda vazifalar (${classTasks.length})</button>
+  `;
+  
+  document.getElementById('home-tasks').innerHTML = homeTasks.length ? homeTasks.map(renderStudentTask).join('') : '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Uyga vazifalar yo\'q</div>';
+  document.getElementById('class-tasks').innerHTML = classTasks.length ? classTasks.map(renderStudentTask).join('') : '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Darsda vazifalar yo\'q</div>';
+}
+
+function switchTaskTab(tabId) {
+  document.querySelectorAll('#student-page-s-tasks .task-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#student-page-s-tasks .tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+function openSubmitModal(taskId) {
+  submitTaskId = taskId;
+  dbGet('tasks', taskId).then(task => {
+    document.getElementById('submit-task-title').innerHTML = `📤 "${task.title}" — Javob yuborish <button class="modal-close" onclick="closeModal('submit-task-modal')">✕</button>`;
+    document.getElementById('submit-task-desc').innerHTML = `<strong>Vazifa:</strong><br>${task.desc}`;
+    document.getElementById('submit-answer').value = '';
+    document.getElementById('submit-task-modal').classList.remove('hidden');
+  });
+}
+
+async function submitTask() {
+  const answer = document.getElementById('submit-answer').value.trim();
+  if (!answer) { showToast('Javob yozing', 'error'); return; }
+  
+  const task = await dbGet('tasks', submitTaskId);
+  if (!isDeadlineActive(task)) { showToast('Muddat tugagan!', 'error'); return; }
+  
+  // Check duplicate
+  const subs = await dbGetAll('submissions');
+  if (subs.find(s => s.taskId === submitTaskId && s.userId === currentUser.id)) {
+    showToast('Siz allaqachon javob yuborgansiz', 'error'); return;
+  }
+  
+  await dbAdd('submissions', {
+    taskId: submitTaskId,
+    userId: currentUser.id,
+    answer,
+    submittedAt: new Date().toISOString(),
+    score: null,
+    aiComment: null
+  });
+  
+  closeModal('submit-task-modal');
+  showToast('✅ Vazifa yuborildi!', 'success');
+  loadStudentTasks();
+  loadStudentDashboard();
+}
+
+// ============================================================
+// STUDENT CHAT
+// ============================================================
+async function loadStudentChat() {
+  const user = await dbGet('users', currentUser.id);
+  if (!user || !user.groupId) return;
+  
+  const messages = await dbGetByIndex('messages', 'groupId', user.groupId);
+  const users = await dbGetAll('users');
+  const mentors = await dbGetAll('mentors');
+  renderChatMessages('student-chat-messages', messages, users, mentors);
+}
+
+async function sendStudentChat() {
+  const input = document.getElementById('student-chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  
+  const user = await dbGet('users', currentUser.id);
+  if (!user || !user.groupId) { showToast('Guruhga kiritilmagansiz', 'error'); return; }
+  
+  await dbAdd('messages', {
+    groupId: user.groupId,
+    senderId: currentUser.id,
+    senderType: 'student',
+    text,
+    createdAt: new Date().toISOString()
+  });
+  
+  input.value = '';
+  loadStudentChat();
+}
+
+// ============================================================
+// STUDENT PROFILE
+// ============================================================
+async function loadStudentProfile() {
+  const user = await dbGet('users', currentUser.id);
+  const scores = await dbGetAll('scores');
+  const myTotal = scores.filter(s => s.userId === currentUser.id).reduce((sum, s) => sum + (s.score || 0), 0);
+  
+  document.getElementById('student-profile-info').innerHTML = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#4f8ef7,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto 12px;">${user.name.charAt(0)}</div>
+      <div style="font-size:18px;font-weight:700;">${user.name}</div>
+      <div style="font-size:12px;color:var(--text3);">@${user.login}</div>
+    </div>
+    <div class="sep"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">Email</span><span>${user.email}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">Telefon</span><span>${user.phone}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">Guruh</span><span class="badge badge-blue">${user.groupName}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">Jami ball</span><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent);">${myTotal}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">Ro'yxat sanasi</span><span>${user.createdAt ? user.createdAt.slice(0,10) : ''}</span></div>
+    </div>
+  `;
+}
+
+async function changePassword() {
+  const current = document.getElementById('current-pass').value;
+  const newPass = document.getElementById('new-pass').value;
+  const confirm = document.getElementById('confirm-new-pass').value;
+  
+  setAlert('change-pass-alert', '');
+  
+  const user = await dbGet('users', currentUser.id);
+  if (user.password !== current) { setAlert('change-pass-alert', 'Joriy parol noto\'g\'ri', 'error'); return; }
+  if (newPass.length < 6) { setAlert('change-pass-alert', 'Yangi parol kamida 6 ta belgi', 'error'); return; }
+  if (newPass !== confirm) { setAlert('change-pass-alert', 'Parollar mos emas', 'error'); return; }
+  
+  user.password = newPass;
+  await dbPut('users', user);
+  setAlert('change-pass-alert', '✅ Parol o\'zgartirildi!', 'success');
+  document.getElementById('current-pass').value = '';
+  document.getElementById('new-pass').value = '';
+  document.getElementById('confirm-new-pass').value = '';
+}
+
+// ============================================================
+// CALENDAR RENDER
+// ============================================================
+async function renderCalendar(containerId, role) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  
+  const events = await dbGetAll('events');
+  
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  
+  const monthNames = ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'];
+  const dayNames = ['Ya','Du','Se','Ch','Pa','Ju','Sh'];
+  
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-weight:700;font-size:14px;">${monthNames[month]} ${year}</span>
+    </div>
+    <div class="calendar-grid">
+      ${dayNames.map(d => `<div class="cal-header">${d}</div>`).join('')}
+  `;
+  
+  // Empty cells
+  const startDay = firstDay === 0 ? 6 : firstDay - 1;
+  for (let i = 0; i < startDay; i++) {
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasEvent = events.some(e => e.date === dateStr);
+    const isToday = d === now.getDate();
+    
+    html += `<div class="cal-day ${isToday?'today':''} ${hasEvent?'has-event':''}">${d}</div>`;
+  }
+  
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function isDeadlineActive(task) {
+  if (!task.active) return false;
+  if (!task.deadline) return true;
+  return new Date(task.deadline.replace(' ', 'T')) > new Date();
+}
+
+function formatDateShort(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getDate()}.${d.getMonth()+1}`;
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+function setAlert(id, msg, type = 'error') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!msg) { el.innerHTML = ''; return; }
+  const types = { error: 'alert-error', success: 'alert-success', warn: 'alert-warn', info: 'alert-info' };
+  el.innerHTML = `<div class="alert ${types[type]||'alert-info'}">${msg}</div>`;
+}
+
+function showToast(msg, type = 'success', duration = 3000) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span> ${msg}`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), duration);
+}
+
+function logout() {
+  sessionStorage.removeItem('uy_session');
+  currentUser = null;
+  document.getElementById('admin-panel').style.display = 'none';
+  document.getElementById('mentor-panel').style.display = 'none';
+  document.getElementById('student-panel').style.display = 'none';
+  showAuthScreen();
+  showToast('Tizimdan chiqdingiz', 'success');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.add('hidden');
+  });
+});
+
+// ============================================================
+// START
+// ============================================================
+init();
+</script>
+</body>
+</html>
