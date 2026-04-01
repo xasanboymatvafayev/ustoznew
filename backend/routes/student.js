@@ -175,4 +175,41 @@ router.get('/profile', async (req, res) => {
   }
 });
 
+// Get schedule for student's group (read-only)
+router.get('/schedule', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    // O'quvchining guruhini top
+    const grpRes = await db.query(
+      `SELECT g.* FROM group_members gm JOIN groups g ON gm.group_id=g.id WHERE gm.user_id=$1 LIMIT 1`,
+      [req.user.id]
+    );
+    if (!grpRes.rows.length) return res.json({ group: null, members: [], assignments: [], scores: [] });
+
+    const group = grpRes.rows[0];
+    const groupId = group.id;
+
+    const members = await db.query(
+      `SELECT u.id, u.full_name FROM group_members gm JOIN users u ON gm.user_id=u.id WHERE gm.group_id=$1 ORDER BY u.full_name`,
+      [groupId]
+    );
+    const assignments = await db.query(
+      `SELECT a.*,
+        json_agg(json_build_object('user_id',s.user_id,'score',s.score,'submitted_at',s.submitted_at)) as submissions
+       FROM assignments a
+       LEFT JOIN submissions s ON a.id=s.assignment_id
+       WHERE a.group_id=$1 AND a.lesson_date IS NOT NULL
+       GROUP BY a.id ORDER BY a.lesson_date`,
+      [groupId]
+    );
+    const scores = await db.query(
+      `SELECT sc.* FROM scores sc WHERE sc.group_id=$1`, [groupId]
+    );
+
+    res.json({ group, members: members.rows, assignments: assignments.rows, scores: scores.rows });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
