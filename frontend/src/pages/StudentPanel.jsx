@@ -511,7 +511,7 @@ function StudentSchedule({ group, userId }) {
 
   const load = async () => {
     setLoading(true);
-    try { const r = await API.get(`/mentor/groups/${group.id}/schedule`); setScheduleData(r.data); } catch { }
+    try { const r = await API.get('/student/schedule'); setScheduleData(r.data); } catch (e) { console.error(e); }
     setLoading(false);
   };
 
