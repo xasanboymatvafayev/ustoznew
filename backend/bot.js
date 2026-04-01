@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const ADMIN_ID = ['6365371142' , '8517530604'];
-const isAdmin = (id) => id.toString() === ADMIN_ID;
+const isAdmin = (id) => ADMIN_IDS.includes(id.toString());
 
 // ── EmailJS ──────────────────────────────────────────────────
 async function sendEmailCode(toEmail, code, fullName) {
