@@ -462,7 +462,11 @@ function ClassworkView({ group }) {
   };
 
   const handleStart = async (aId) => {
-    await API.post(`/mentor/assignments/${aId}/start`);
+    const r = await API.post(`/mentor/assignments/${aId}/start`);
+    const a = r.data;
+    // Darhol to'liq vaqtdan boshlaymiz — serverga ishonmaymiz
+    const totalSec = a.duration_minutes * 60;
+    setTimers(p => ({ ...p, [aId]: totalSec }));
     load();
   };
 
