@@ -425,8 +425,8 @@ function StudentClasswork() {
     const t = {};
     const now = Date.now();
     r.data.forEach(a => {
-      if (a.is_open && a.duration_minutes && a.created_at) {
-        const startedAt = new Date(a.created_at).getTime();
+      if (a.is_open && a.duration_minutes && a.started_at) {
+        const startedAt = new Date(a.started_at).getTime();
         const totalSec = a.duration_minutes * 60;
         const elapsed = Math.floor((now - startedAt) / 1000);
         const remaining = totalSec - elapsed;
