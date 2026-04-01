@@ -868,20 +868,26 @@ function ScheduleView({ group }) {
 
 // ── ATTENDANCE VIEW ──
 function AttendanceView({ group }) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().slice(0, 10);
+
   const getLessonDates = () => {
     const { lesson_days, start_date, end_date } = group;
-    if (!start_date || !end_date) return [];
+    // Sana kiritilmagan bo'lsa — oxirgi 60 kun ichidagi dars kunlarini ko'rsatamiz
+    const start = start_date ? new Date(start_date) : new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const endD = end_date
+      ? (new Date(end_date) < today ? new Date(end_date) : today)
+      : today;
+
     const dates = [];
-    let d = new Date(start_date);
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const endD = new Date(end_date) < today ? new Date(end_date) : today;
+    let d = new Date(start);
     while (d <= endD) {
       const day = d.getDay();
       let ok = false;
       if (lesson_days === 'juft') ok = [2, 4, 6].includes(day);
       else if (lesson_days === 'toq') ok = [1, 3, 5].includes(day);
-      else ok = day !== 0;
+      else ok = day !== 0; // har kuni (yakshanbasiz)
       if (ok) dates.push(d.toISOString().slice(0, 10));
       d.setDate(d.getDate() + 1);
     }
@@ -889,7 +895,7 @@ function AttendanceView({ group }) {
   };
 
   const allDates = getLessonDates();
-  const [selectedDate, setSelectedDate] = useState(allDates[0] || '');
+  const [selectedDate, setSelectedDate] = useState(allDates[0] || todayStr);
   const [members, setMembers] = useState([]);
   const [attendance, setAttendance] = useState({}); // {user_id: 'present'|'absent'}
   const [history, setHistory] = useState([]); // all attendance records
@@ -965,7 +971,7 @@ function AttendanceView({ group }) {
           <div className="card" style={{ marginBottom: '16px', padding: '16px' }}>
             <label style={{ fontSize: '13px', color: 'var(--text3)', display: 'block', marginBottom: '8px' }}>📅 Dars kunini tanlang:</label>
             {allDates.length === 0 ? (
-              <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Guruhda boshlash/tugash sanasi kiritilmagan</p>
+              <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Dars kunlari topilmadi. Guruh sozlamalarini tekshiring.</p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {allDates.slice(0, 20).map(date => {
