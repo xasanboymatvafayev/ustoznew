@@ -12,10 +12,10 @@ async function sendEmailCode(toEmail, code, fullName) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        service_id:  process.env.EMAILJS_SERVICE_ID,
-        template_id: process.env.EMAILJS_TEMPLATE_ID,
-        user_id:     process.env.EMAILJS_PUBLIC_KEY,
-        accessToken: process.env.EMAILJS_PRIVATE_KEY,
+        service_id:  'service_8ydilud',
+        template_id: 'template_92ivt1m',
+        user_id:     'j5RueHALLy0tonOBq',
+        accessToken: 'b2ERBmdg-259dwmlIVxDu',
         template_params: {
           to_email: toEmail,
           to_name:  fullName,
@@ -130,12 +130,14 @@ bot.on('message', async (msg) => {
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = new Date(Date.now() + 10 * 60 * 1000);
+    // telegram_chat_id ni HALI saqlamaymiz — faqat kod tasdiqlangandan keyin saqlanadi
     await pool.query(
-      `UPDATE users SET verification_code=$1, verification_expires=$2, telegram_chat_id=$3 WHERE id=$4`,
-      [code, expires, chatId.toString(), student.id]
+      `UPDATE users SET verification_code=$1, verification_expires=$2 WHERE id=$3`,
+      [code, expires, student.id]
     );
     s.step = 'ask_email_code';
     s.verifyUserId = student.id;
+    s.pendingChatId = chatId.toString(); // vaqtinchalik session da saqlaymiz
 
     const sent = await sendEmailCode(student.email, code, student.full_name);
     if (!sent) {
@@ -158,7 +160,11 @@ bot.on('message', async (msg) => {
     if (!res.rows.length) {
       return bot.sendMessage(chatId, '❌ Kod noto\'g\'ri yoki muddati o\'tgan. Qaytadan kiriting:');
     }
-    await pool.query('UPDATE users SET verification_code=null WHERE id=$1', [s.verifyUserId]);
+    // Faqat shu yerda telegram_chat_id saqlanadi — xavfsiz
+    await pool.query(
+      'UPDATE users SET verification_code=null, telegram_chat_id=$1 WHERE id=$2',
+      [s.pendingChatId, s.verifyUserId]
+    );
     clearSession(chatId);
     return bot.sendMessage(chatId,
       '🎉 *Muvaffaqiyatli ro\'yxatdan o\'tdingiz!*\n\nEndi quyidagi bo\'limlardan foydalanishingiz mumkin:',
