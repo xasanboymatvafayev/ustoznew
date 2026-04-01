@@ -4,83 +4,105 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const ADMIN_ID = '6365371142';
+const isAdmin = (id) => id.toString() === ADMIN_ID;
 
-// ── EmailJS orqali email yuborish ────────────────────────────
+// ── EmailJS ──────────────────────────────────────────────────
 async function sendEmailCode(toEmail, code, fullName) {
   try {
     const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        service_id:  'service_8ydilud',
-        template_id: 'template_92ivt1m',
-        user_id:     'j5RueHALLy0tonOBq',
-        accessToken: 'b2ERBmdg-259dwmlIVxDu',
-        template_params: {
-          to_email: toEmail,
-          to_name:  fullName,
-          code:     code,
-        },
+        service_id: 'service_8ydilud', template_id: 'template_92ivt1m',
+        user_id: 'j5RueHALLy0tonOBq', accessToken: 'b2ERBmdg-259dwmlIVxDu',
+        template_params: { to_email: toEmail, to_name: fullName, code },
       }),
     });
-    if (res.ok) {
-      console.log('Email yuborildi:', toEmail);
-      return true;
-    }
-    const err = await res.text();
-    console.error('EmailJS xato:', err);
-    return false;
-  } catch (e) {
-    console.error('Email yuborishda xato:', e.message);
-    return false;
-  }
+    return res.ok;
+  } catch { return false; }
 }
 
 // ── Bot ──────────────────────────────────────────────────────
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) { console.error('BOT_TOKEN yoq'); process.exit(1); }
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
-
-// ── Session ──────────────────────────────────────────────────
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 const sessions = {};
-function session(chatId) {
-  if (!sessions[chatId]) sessions[chatId] = {};
-  return sessions[chatId];
-}
-function clearSession(chatId) { sessions[chatId] = {}; }
+const session = (id) => { if (!sessions[id]) sessions[id] = {}; return sessions[id]; };
+const clearSession = (id) => { sessions[id] = {}; };
 
-// ── Asosiy menyu ─────────────────────────────────────────────
-function mainMenu() {
-  return {
-    inline_keyboard: [
-      [{ text: '📊 Baholarim',        callback_data: 'grades'     }],
-      [{ text: '🏆 Sinfdagi reyting',  callback_data: 'rating'     }],
-      [{ text: '📅 Davomat',           callback_data: 'attendance' }],
-      [{ text: '📝 Vazifalar',         callback_data: 'tasks'      }],
-      [{ text: '👤 Profil',            callback_data: 'profile'    }],
+// ── Menyular ─────────────────────────────────────────────────
+const mainMenu = () => ({
+  inline_keyboard: [
+    [
+      { text: '📊 Baholar',   callback_data: 'grades' },
+      { text: '🏆 Reyting',   callback_data: 'rating' },
     ],
-  };
-}
+    [
+      { text: '📅 Davomat',   callback_data: 'attendance' },
+      { text: '📝 Vazifalar', callback_data: 'tasks' },
+    ],
+    [{ text: '👤 Profil va sozlamalar', callback_data: 'profile' }],
+  ],
+});
+
+const adminMenu = () => ({
+  inline_keyboard: [
+    [
+      { text: '📊 Statistika',  callback_data: 'admin_stats' },
+      { text: '🏫 Guruhlar',    callback_data: 'admin_groups' },
+    ],
+    [
+      { text: '👥 O\'quvchilar', callback_data: 'admin_users' },
+      { text: '📢 Rasilka',     callback_data: 'admin_broadcast' },
+    ],
+  ],
+});
+
+const backToMain = () => ({ inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] });
+const backToAdmin = () => ({ inline_keyboard: [[{ text: '🔙 Admin menyu', callback_data: 'admin_menu' }]] });
 
 // ── /start ───────────────────────────────────────────────────
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
+
+  if (isAdmin(chatId)) {
+    return bot.sendMessage(chatId,
+      `╔══════════════════════╗\n` +
+      `║   🛡️  ADMIN PANEL    ║\n` +
+      `╚══════════════════════╝\n\n` +
+      `Xush kelibsiz, *Admin*!\n\n` +
+      `Quyidagi bo'limlardan birini tanlang:`,
+      { parse_mode: 'Markdown', reply_markup: adminMenu() }
+    );
+  }
+
   const linked = await pool.query(
-    'SELECT * FROM users WHERE telegram_chat_id=$1 AND is_verified=true',
-    [chatId.toString()]
+    'SELECT * FROM users WHERE telegram_chat_id=$1 AND is_verified=true', [chatId.toString()]
   );
   if (linked.rows.length) {
+    const u = linked.rows[0];
     return bot.sendMessage(chatId,
-      `👋 Xush kelibsiz, *${linked.rows[0].full_name}*!\n\nQuyidagi bo'limlardan birini tanlang:`,
+      `👋 Xush kelibsiz, *${u.full_name}*!\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🎓 Ustoz Yordamchi Bot\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `Quyidagi bo'limlardan birini tanlang 👇`,
       { parse_mode: 'Markdown', reply_markup: mainMenu() }
     );
   }
+
   clearSession(chatId);
   session(chatId).step = 'ask_group';
   bot.sendMessage(chatId,
-    '🎓 *Ustoz Yordamchi Botiga xush kelibsiz!*\n\n' +
-    'Bu bot ota-onalar uchun: farzandingizning baholari, davomati va vazifalari haqida ma\'lumot olishingiz mumkin.\n\n' +
-    '📌 Ro\'yxatdan o\'tish uchun *guruh nomini* kiriting (masalan: N45):',
+    `🎓 *Ustoz Yordamchi*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Bu bot ota-onalar uchun:\n` +
+    `• 📊 Farzandingiz baholari\n` +
+    `• 📅 Davomat holati\n` +
+    `• 📝 Vazifalar\n` +
+    `• 🏆 Sinf reytingi\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📌 Boshlash uchun *guruh nomini* kiriting:\n` +
+    `_(masalan: N45, A1, Python-2)_`,
     { parse_mode: 'Markdown' }
   );
 });
@@ -92,30 +114,55 @@ bot.on('message', async (msg) => {
   const text = msg.text.trim();
   const s = session(chatId);
 
+  // Admin rasilka
+  if (isAdmin(chatId) && s.step === 'admin_broadcast') {
+    clearSession(chatId);
+    const statusMsg = await bot.sendMessage(chatId, '📡 Rasilka yuborilmoqda...');
+    const users = await pool.query(
+      'SELECT telegram_chat_id FROM users WHERE telegram_chat_id IS NOT NULL AND is_verified=true'
+    );
+    let sent = 0, failed = 0;
+    for (const u of users.rows) {
+      try {
+        await bot.sendMessage(u.telegram_chat_id,
+          `📢 *Ustoz Yordamchi — E'lon*\n━━━━━━━━━━━━━━━━━━━━━\n\n${text}`,
+          { parse_mode: 'Markdown' }
+        );
+        sent++;
+        await new Promise(r => setTimeout(r, 50));
+      } catch { failed++; }
+    }
+    await bot.deleteMessage(chatId, statusMsg.message_id);
+    return bot.sendMessage(chatId,
+      `✅ *Rasilka tugadi!*\n\n` +
+      `📤 Muvaffaqiyatli: *${sent}* ta\n` +
+      `❌ Xato: *${failed}* ta\n` +
+      `👥 Jami: *${sent + failed}* ta`,
+      { parse_mode: 'Markdown', reply_markup: adminMenu() }
+    );
+  }
+
   // 1. Guruh nomi
   if (s.step === 'ask_group') {
     const res = await pool.query(
       `SELECT u.id, u.full_name, u.email
-         FROM group_members gm
-         JOIN users u ON gm.user_id=u.id
+         FROM group_members gm JOIN users u ON gm.user_id=u.id
          JOIN groups g ON gm.group_id=g.id
-        WHERE g.name ILIKE $1 AND u.is_verified=true
-        ORDER BY u.full_name`,
+        WHERE g.name ILIKE $1 AND u.is_verified=true ORDER BY u.full_name`,
       [text]
     );
     if (!res.rows.length) {
       return bot.sendMessage(chatId,
-        `❌ *"${text}"* nomli guruh topilmadi.\n\nQaytadan kiriting:`,
+        `❌ *"${text}"* guruh topilmadi\n\n_Guruh nomini to'g'ri kiriting:_`,
         { parse_mode: 'Markdown' }
       );
     }
-    s.groupName = text;
-    s.students = res.rows;
-    s.step = 'choose_student';
-    const keyboard = res.rows.map(st => [{ text: st.full_name, callback_data: `student_${st.id}` }]);
+    s.groupName = text; s.students = res.rows; s.step = 'choose_student';
+    const keyboard = res.rows.map(st => [{ text: `👤 ${st.full_name}`, callback_data: `student_${st.id}` }]);
     keyboard.push([{ text: '❌ Bekor qilish', callback_data: 'cancel' }]);
     return bot.sendMessage(chatId,
-      `✅ *${text}* guruhida ${res.rows.length} ta o'quvchi.\n\nFarzandingizni tanlang:`,
+      `✅ *${text}* guruhida *${res.rows.length}* ta o'quvchi\n\n` +
+      `👇 Farzandingizni tanlang:`,
       { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }
     );
   }
@@ -126,27 +173,33 @@ bot.on('message', async (msg) => {
     if (!student) return;
     const userRes = await pool.query('SELECT * FROM users WHERE id=$1', [student.id]);
     const valid = await bcrypt.compare(text, userRes.rows[0].password_hash);
-    if (!valid) return bot.sendMessage(chatId, '❌ Parol noto\'g\'ri. Qaytadan kiriting:');
-
+    if (!valid) {
+      return bot.sendMessage(chatId,
+        `❌ *Parol noto'g'ri*\n\nQaytadan kiriting:`,
+        { parse_mode: 'Markdown' }
+      );
+    }
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = new Date(Date.now() + 10 * 60 * 1000);
-    // telegram_chat_id ni HALI saqlamaymiz — faqat kod tasdiqlangandan keyin saqlanadi
     await pool.query(
       `UPDATE users SET verification_code=$1, verification_expires=$2 WHERE id=$3`,
       [code, expires, student.id]
     );
-    s.step = 'ask_email_code';
-    s.verifyUserId = student.id;
-    s.pendingChatId = chatId.toString(); // vaqtinchalik session da saqlaymiz
+    s.step = 'ask_email_code'; s.verifyUserId = student.id; s.pendingChatId = chatId.toString();
 
     const sent = await sendEmailCode(student.email, code, student.full_name);
     if (!sent) {
       return bot.sendMessage(chatId,
-        '⚠️ Email yuborishda xatolik yuz berdi. Iltimos qayta urinib ko\'ring yoki adminga murojaat qiling.'
+        `⚠️ *Email yuborishda xatolik*\n\nIltimos qayta urinib ko'ring yoki adminga murojaat qiling.`,
+        { parse_mode: 'Markdown' }
       );
     }
     return bot.sendMessage(chatId,
-      `📧 *${student.email}* manziliga tasdiqlash kodi yuborildi.\n\n6 xonali kodni kiriting:`,
+      `📧 *Tasdiqlash kodi yuborildi!*\n\n` +
+      `📮 Email: \`${student.email}\`\n` +
+      `⏳ Amal qilish vaqti: *10 daqiqa*\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👇 6 xonali kodni kiriting:`,
       { parse_mode: 'Markdown' }
     );
   }
@@ -158,16 +211,21 @@ bot.on('message', async (msg) => {
       [s.verifyUserId, text]
     );
     if (!res.rows.length) {
-      return bot.sendMessage(chatId, '❌ Kod noto\'g\'ri yoki muddati o\'tgan. Qaytadan kiriting:');
+      return bot.sendMessage(chatId,
+        `❌ *Kod noto'g'ri yoki muddati o'tgan*\n\nQaytadan kiriting:`,
+        { parse_mode: 'Markdown' }
+      );
     }
-    // Faqat shu yerda telegram_chat_id saqlanadi — xavfsiz
     await pool.query(
       'UPDATE users SET verification_code=null, telegram_chat_id=$1 WHERE id=$2',
       [s.pendingChatId, s.verifyUserId]
     );
     clearSession(chatId);
     return bot.sendMessage(chatId,
-      '🎉 *Muvaffaqiyatli ro\'yxatdan o\'tdingiz!*\n\nEndi quyidagi bo\'limlardan foydalanishingiz mumkin:',
+      `🎉 *Muvaffaqiyatli ro'yxatdan o'tdingiz!*\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Endi farzandingiz haqida\n` +
+      `barcha ma'lumotlarni ko'rishingiz mumkin 👇`,
       { parse_mode: 'Markdown', reply_markup: mainMenu() }
     );
   }
@@ -181,26 +239,116 @@ bot.on('callback_query', async (query) => {
   const s = session(chatId);
   await bot.answerCallbackQuery(query.id);
 
+  // ── ADMIN ────────────────────────────────────────────────
+  if (isAdmin(chatId)) {
+    if (data === 'admin_menu') {
+      return bot.editMessageText(
+        `╔══════════════════════╗\n` +
+        `║   🛡️  ADMIN PANEL    ║\n` +
+        `╚══════════════════════╝\n\n` +
+        `Bo'limni tanlang:`,
+        { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: adminMenu() }
+      );
+    }
+
+    if (data === 'admin_stats') {
+      const q = await pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM users WHERE is_verified=true)::int as students,
+          (SELECT COUNT(*) FROM mentors WHERE is_active=true)::int as mentors,
+          (SELECT COUNT(*) FROM groups WHERE is_active=true)::int as groups,
+          (SELECT COUNT(*) FROM users WHERE telegram_chat_id IS NOT NULL AND is_verified=true)::int as bot_users,
+          (SELECT COUNT(*) FROM assignments)::int as assignments,
+          (SELECT COUNT(*) FROM submissions)::int as submissions
+      `);
+      const s = q.rows[0];
+      return bot.editMessageText(
+        `📊 *Tizim statistikasi*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `🎓 O'quvchilar:        *${s.students}* ta\n` +
+        `👨‍🏫 Mentorlar:          *${s.mentors}* ta\n` +
+        `🏫 Faol guruhlar:      *${s.groups}* ta\n` +
+        `✈️  Bot foydalanuvchi: *${s.bot_users}* ta\n` +
+        `📝 Jami vazifalar:     *${s.assignments}* ta\n` +
+        `✅ Topshirishlar:      *${s.submissions}* ta\n\n` +
+        `📈 Bot ulash foizi: *${s.students > 0 ? Math.round(s.bot_users/s.students*100) : 0}%*`,
+        { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToAdmin() }
+      );
+    }
+
+    if (data === 'admin_broadcast') {
+      session(chatId).step = 'admin_broadcast';
+      return bot.editMessageText(
+        `📢 *Rasilka yuborish*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Barcha bot foydalanuvchilariga yuboriladigan\n` +
+        `xabar matnini yozing:\n\n` +
+        `_Markdown ishlaydi:_\n` +
+        `• \`*qalin*\` → *qalin*\n` +
+        `• \`_kursiv_\` → _kursiv_\n` +
+        `• \`\`\`kod\`\`\` → kod bloki`,
+        { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[{ text: '❌ Bekor qilish', callback_data: 'admin_menu' }]] }
+        }
+      );
+    }
+
+    if (data === 'admin_users') {
+      const res = await pool.query(`
+        SELECT u.full_name, u.group_name,
+               CASE WHEN u.telegram_chat_id IS NOT NULL THEN '✅' ELSE '➖' END as bot
+        FROM users u WHERE u.is_verified=true ORDER BY u.created_at DESC LIMIT 20
+      `);
+      let txt = `👥 *So'nggi 20 ta o'quvchi*\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      res.rows.forEach((u, i) => {
+        txt += `${i+1}. ${u.bot} *${u.full_name}*\n   📚 ${u.group_name || '—'}\n`;
+      });
+      txt += `\n✅ = Bot ulangan  ➖ = Ulanmagan`;
+      return bot.editMessageText(txt, {
+        chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToAdmin()
+      });
+    }
+
+    if (data === 'admin_groups') {
+      const res = await pool.query(`
+        SELECT g.name, g.subject, g.lesson_days,
+               (SELECT COUNT(*) FROM group_members WHERE group_id=g.id)::int as cnt,
+               m.full_name as mentor
+        FROM groups g LEFT JOIN mentors m ON g.mentor_id=m.id
+        WHERE g.is_active=true ORDER BY g.name
+      `);
+      let txt = `🏫 *Faol guruhlar* (${res.rows.length} ta)\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      res.rows.forEach(g => {
+        const days = g.lesson_days === 'juft' ? 'Se,Pay,Sha' : g.lesson_days === 'toq' ? 'Du,Chor,Ju' : 'Har kuni';
+        txt += `📚 *${g.name}* — ${g.cnt} o'q\n`;
+        txt += `   👨‍🏫 ${g.mentor || 'Mentor yo\'q'} | 📅 ${days}\n\n`;
+      });
+      return bot.editMessageText(txt, {
+        chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToAdmin()
+      });
+    }
+  }
+
+  // ── UMUMIY ───────────────────────────────────────────────
   if (data === 'cancel') {
     clearSession(chatId);
     return bot.editMessageText('❌ Bekor qilindi.', { chat_id: chatId, message_id: msgId });
   }
 
   if (data.startsWith('student_') && s.step === 'choose_student') {
-    const studentId = data.replace('student_', '');
-    const student = s.students.find(st => st.id === studentId);
+    const student = s.students.find(st => st.id === data.replace('student_', ''));
     if (!student) return;
-    s.selectedStudent = student;
-    s.step = 'ask_password';
+    s.selectedStudent = student; s.step = 'ask_password';
     return bot.editMessageText(
-      `👤 *${student.full_name}* tanlandi.\n\n🔐 Web-saytdagi *parolini* kiriting:`,
+      `👤 *${student.full_name}* tanlandi\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔐 Web-saytdagi *parolini* kiriting:`,
       { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' }
     );
   }
 
   const linked = await pool.query(
-    'SELECT * FROM users WHERE telegram_chat_id=$1 AND is_verified=true',
-    [chatId.toString()]
+    'SELECT * FROM users WHERE telegram_chat_id=$1 AND is_verified=true', [chatId.toString()]
   );
   if (!linked.rows.length) {
     return bot.sendMessage(chatId, '⚠️ Avval /start orqali ro\'yxatdan o\'ting.');
@@ -210,26 +358,28 @@ bot.on('callback_query', async (query) => {
   // Baholar
   if (data === 'grades') {
     const res = await pool.query(
-      `SELECT a.title, s.score, a.lesson_date, a.due_date
+      `SELECT a.title, s.score, a.lesson_date, a.due_date, a.type
          FROM submissions s JOIN assignments a ON s.assignment_id=a.id
-        WHERE s.user_id=$1 ORDER BY COALESCE(a.lesson_date,a.due_date) DESC LIMIT 20`,
+        WHERE s.user_id=$1 ORDER BY COALESCE(a.lesson_date,a.due_date) DESC LIMIT 15`,
       [user.id]
     );
     if (!res.rows.length) {
-      return bot.editMessageText('📊 Hozircha baho yo\'q.', {
-        chat_id: chatId, message_id: msgId,
-        reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
-      });
+      return bot.editMessageText(
+        `📊 *Baholar*\n━━━━━━━━━━━━━━━━━━━━━\n\nHozircha baho yo'q`,
+        { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToMain() }
+      );
     }
-    let txt = `📊 *${user.full_name} — So'nggi baholar*\n\n`;
+    const avg = Math.round(res.rows.reduce((a,b) => a + b.score, 0) / res.rows.length);
+    let txt = `📊 *Baholar — ${user.full_name}*\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
     for (const r of res.rows) {
-      const date = r.lesson_date || r.due_date || '';
-      const icon = r.score >= 80 ? '🟢' : r.score >= 60 ? '🟡' : '🔴';
-      txt += `${icon} *${r.title}*\n   Baho: ${r.score}/100  |  ${date}\n\n`;
+      const date = (r.lesson_date || r.due_date || '').toString().slice(0, 10);
+      const icon = r.score >= 85 ? '🟢' : r.score >= 60 ? '🟡' : '🔴';
+      const bar = '█'.repeat(Math.floor(r.score/10)) + '░'.repeat(10-Math.floor(r.score/10));
+      txt += `${icon} *${r.title}*\n   ${bar} ${r.score}/100\n   📅 ${date}\n\n`;
     }
+    txt += `━━━━━━━━━━━━━━━━━━━━━\n📈 O'rtacha ball: *${avg}/100*`;
     return bot.editMessageText(txt, {
-      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
+      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToMain()
     });
   }
 
@@ -244,24 +394,25 @@ bot.on('callback_query', async (query) => {
     }
     const group = grpRes.rows[0];
     const rating = await pool.query(
-      `SELECT u.full_name, COALESCE(SUM(s.score),0) AS total
+      `SELECT u.full_name, COALESCE(SUM(s.score),0)::int AS total
          FROM group_members gm JOIN users u ON gm.user_id=u.id
          LEFT JOIN submissions s ON s.user_id=u.id
          LEFT JOIN assignments a ON s.assignment_id=a.id AND a.group_id=$1
         WHERE gm.group_id=$1 GROUP BY u.id, u.full_name ORDER BY total DESC`,
       [group.id]
     );
-    let txt = `🏆 *${group.name} guruhidagi reyting*\n\n`;
-    let rank = 1;
-    for (const r of rating.rows) {
+    let txt = `🏆 *${group.name} — Reyting*\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    const medals = ['🥇','🥈','🥉'];
+    rating.rows.forEach((r, i) => {
       const isMine = r.full_name === user.full_name;
-      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-      txt += `${medal} ${isMine ? '*' : ''}${r.full_name}${isMine ? '*' : ''} — ${r.total} ball\n`;
-      rank++;
-    }
+      const medal = medals[i] || `${i+1}.`;
+      const name = isMine ? `*${r.full_name}* 👈` : r.full_name;
+      txt += `${medal} ${name}\n   💯 ${r.total} ball\n`;
+    });
+    const myRank = rating.rows.findIndex(r => r.full_name === user.full_name) + 1;
+    txt += `\n━━━━━━━━━━━━━━━━━━━━━\n🎯 Sizning o'rningiz: *${myRank}-o'rin*`;
     return bot.editMessageText(txt, {
-      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
+      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToMain()
     });
   }
 
@@ -272,23 +423,27 @@ bot.on('callback_query', async (query) => {
       [user.id]
     );
     if (!res.rows.length) {
-      return bot.editMessageText('📅 Davomat ma\'lumoti yo\'q.', {
-        chat_id: chatId, message_id: msgId,
-        reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
-      });
+      return bot.editMessageText(
+        `📅 *Davomat*\n━━━━━━━━━━━━━━━━━━━━━\n\nHozircha ma'lumot yo'q`,
+        { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToMain() }
+      );
     }
     const total = res.rows.length;
     const present = res.rows.filter(r => r.status === 'present').length;
-    const pct = Math.round((present / total) * 100);
-    let txt = `📅 *${user.full_name} — Davomat*\n\n`;
-    txt += `✅ Kelgan: ${present} / ${total} (${pct}%)\n`;
-    txt += `❌ Kelmagan: ${total - present}\n\n*So'nggi 10 dars:*\n`;
-    for (const r of res.rows.slice(0, 10)) {
-      txt += `${r.status === 'present' ? '✅' : '❌'} ${r.lesson_date}\n`;
-    }
+    const pct = Math.round(present / total * 100);
+    const bar = '🟢'.repeat(Math.floor(pct/10)) + '⬜'.repeat(10-Math.floor(pct/10));
+    let txt = `📅 *Davomat — ${user.full_name}*\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    txt += `${bar}\n\n`;
+    txt += `✅ Kelgan:   *${present}* dars\n`;
+    txt += `❌ Kelmagan: *${total - present}* dars\n`;
+    txt += `📊 Foiz:     *${pct}%*\n\n`;
+    txt += `━━━━━━━━━━━━━━━━━━━━━\n*So'nggi darslar:*\n`;
+    res.rows.slice(0, 10).forEach(r => {
+      const date = r.lesson_date?.toString().slice(0, 10);
+      txt += `${r.status === 'present' ? '✅' : '❌'} ${date}\n`;
+    });
     return bot.editMessageText(txt, {
-      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
+      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToMain()
     });
   }
 
@@ -296,42 +451,46 @@ bot.on('callback_query', async (query) => {
   if (data === 'tasks') {
     const res = await pool.query(
       `SELECT a.title, a.due_date, a.is_open, s.id as sid, s.score
-         FROM assignments a
-         JOIN group_members gm ON a.group_id=gm.group_id
+         FROM assignments a JOIN group_members gm ON a.group_id=gm.group_id
          LEFT JOIN submissions s ON s.assignment_id=a.id AND s.user_id=$1
         WHERE gm.user_id=$1 ORDER BY a.created_at DESC LIMIT 15`,
       [user.id]
     );
     if (!res.rows.length) {
-      return bot.editMessageText('📝 Hozircha vazifa yo\'q.', {
-        chat_id: chatId, message_id: msgId,
-        reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
-      });
+      return bot.editMessageText(
+        `📝 *Vazifalar*\n━━━━━━━━━━━━━━━━━━━━━\n\nHozircha vazifa yo'q`,
+        { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToMain() }
+      );
     }
-    let txt = `📝 *${user.full_name} — Vazifalar*\n\n`;
-    for (const r of res.rows) {
-      const status = r.sid ? `✅ Topshirilgan (${r.score}/100)` : !r.is_open ? '🔒 Yopilgan' : '⏳ Topshirilmagan';
-      txt += `• *${r.title}*\n  ${status}  |  ${r.due_date || ''}\n\n`;
-    }
+    const done = res.rows.filter(r => r.sid).length;
+    const pending = res.rows.filter(r => !r.sid && r.is_open).length;
+    let txt = `📝 *Vazifalar — ${user.full_name}*\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    txt += `✅ Topshirilgan: *${done}* ta\n`;
+    txt += `⏳ Kutilmoqda:  *${pending}* ta\n\n`;
+    txt += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    res.rows.forEach(r => {
+      const icon = r.sid ? '✅' : !r.is_open ? '🔒' : '⏳';
+      const score = r.sid ? ` — *${r.score}/100*` : '';
+      const date = r.due_date ? ` | 📅 ${r.due_date.toString().slice(0,10)}` : '';
+      txt += `${icon} ${r.title}${score}${date}\n`;
+    });
     return bot.editMessageText(txt, {
-      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Bosh menyu', callback_data: 'menu' }]] }
+      chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: backToMain()
     });
   }
 
   // Profil
   if (data === 'profile') {
     const grpRes = await pool.query(
-      `SELECT g.name FROM group_members gm JOIN groups g ON gm.group_id=g.id WHERE gm.user_id=$1`,
-      [user.id]
+      `SELECT g.name FROM group_members gm JOIN groups g ON gm.group_id=g.id WHERE gm.user_id=$1`, [user.id]
     );
-    const groups = grpRes.rows.map(r => r.name).join(', ') || 'Guruh yo\'q';
+    const groups = grpRes.rows.map(r => r.name).join(', ') || '—';
     const txt =
-      `👤 *Profil*\n\n` +
-      `📛 Ism: ${user.full_name}\n` +
-      `📧 Email: ${user.email}\n` +
+      `👤 *Profil*\n━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `📛 Ism:     *${user.full_name}*\n` +
+      `📧 Email:   \`${user.email}\`\n` +
       `📱 Telefon: ${user.phone || '—'}\n` +
-      `🎓 Guruh: ${groups}\n`;
+      `🎓 Guruh:   *${groups}*\n`;
     return bot.editMessageText(txt, {
       chat_id: chatId, message_id: msgId, parse_mode: 'Markdown',
       reply_markup: {
@@ -348,28 +507,29 @@ bot.on('callback_query', async (query) => {
     await pool.query('UPDATE users SET telegram_chat_id=null WHERE telegram_chat_id=$1', [chatId.toString()]);
     clearSession(chatId);
     return bot.editMessageText(
-      '👋 Profildan chiqdingiz.\n\nQaytadan ulanish uchun /start yozing.',
-      { chat_id: chatId, message_id: msgId }
+      `👋 *Profildan chiqdingiz*\n\n` +
+      `Qaytadan ulanish uchun /start yozing.`,
+      { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' }
     );
   }
 
   // Bosh menyu
   if (data === 'menu') {
     return bot.editMessageText(
-      `👋 *${user.full_name}*, bo'limni tanlang:`,
+      `🎓 *Ustoz Yordamchi*\n━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `👋 *${user.full_name}*, bo'limni tanlang 👇`,
       { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: mainMenu() }
     );
   }
 });
 
-// ── Kechki xabarnoma (20:00) ─────────────────────────────────
+// ── Kechki xabarnoma 20:00 UZT ──────────────────────────────
 async function notifyUnsubmitted() {
   try {
     const res = await pool.query(`
       SELECT u.full_name, u.telegram_chat_id, a.title, a.due_date,
-             COUNT(*) OVER (PARTITION BY u.id) AS total_missed
-        FROM assignments a
-        JOIN group_members gm ON a.group_id=gm.group_id
+             COUNT(*) OVER (PARTITION BY u.id)::int AS total_missed
+        FROM assignments a JOIN group_members gm ON a.group_id=gm.group_id
         JOIN users u ON gm.user_id=u.id
        WHERE a.type='homework' AND a.due_date < CURRENT_DATE
          AND u.telegram_chat_id IS NOT NULL
@@ -380,28 +540,31 @@ async function notifyUnsubmitted() {
     for (const r of res.rows) {
       if (seen.has(r.telegram_chat_id)) continue;
       seen.add(r.telegram_chat_id);
-      const missed = parseInt(r.total_missed);
-      let txt = `⚠️ *Vazifa topshirilmadi!*\n\n📝 *${r.title}*\n📅 Muddat: ${r.due_date}\n\n`;
+      const missed = r.total_missed;
+      let txt = `⚠️ *Vazifa topshirilmadi!*\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      txt += `📝 *${r.title}*\n📅 Muddat: ${r.due_date?.toString().slice(0,10)}\n\n`;
       if (missed >= 5) {
-        txt += `🚨 Siz allaqachon *${missed} ta* vazifani topshirmadingiz!\nIltimos, mentor bilan bog'laning!`;
+        txt += `🚨 *Diqqat!* Jami *${missed} ta* vazifa topshirilmadi!\nIltimos, mentor bilan bog'laning!`;
       } else {
-        txt += `Iltimos, vaqtida topshirishga harakat qiling.`;
+        txt += `Bu *${missed}-marta*. Vaqtida topshirishga harakat qiling! 💪`;
       }
       try { await bot.sendMessage(r.telegram_chat_id, txt, { parse_mode: 'Markdown' }); } catch {}
     }
-    console.log(`Xabarnoma: ${seen.size} ta o'quvchi`);
   } catch (e) { console.error('Xabarnoma xato:', e.message); }
 }
 
 function scheduleNightly() {
-  const now = new Date();
-  const target = new Date();
-  target.setHours(20, 0, 0, 0);
-  if (target <= now) target.setDate(target.getDate() + 1);
+  function getDelay() {
+    const now = new Date();
+    const target = new Date(now.getTime() + 5 * 60 * 60 * 1000); // UZT
+    target.setUTCHours(15, 0, 0, 0); // 20:00 UZT = 15:00 UTC
+    if (target <= now) target.setUTCDate(target.getUTCDate() + 1);
+    return target - now;
+  }
   setTimeout(() => {
     notifyUnsubmitted();
     setInterval(notifyUnsubmitted, 24 * 60 * 60 * 1000);
-  }, target - now);
+  }, getDelay());
 }
 scheduleNightly();
 
