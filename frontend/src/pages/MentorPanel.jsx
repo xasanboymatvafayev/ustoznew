@@ -5,7 +5,7 @@ import API from '../utils/api';
 
 // ✅ TUZATILDI: API key env o'zgaruvchisidan o'qiladi
 // frontend/.env ga qo'shing: REACT_APP_GEMINI_KEY=sizning_keyingiz
-const GROQ_KEY = process.env.REACT_APP_GROQ_KEY || '';
+const GROQ_KEY = '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';
 
 const geminiCheck = async (assignmentTitle, studentAnswer) => {
   if (!GROQ_KEY) {
