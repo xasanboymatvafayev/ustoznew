@@ -76,7 +76,7 @@ router.get('/groups/:id/schedule', async (req, res) => {
     );
     const assignments = await db.query(
       `SELECT a.*, 
-        json_agg(json_build_object('user_id',s.user_id,'score',s.score,'submitted_at',s.submitted_at)) as submissions
+        json_agg(json_build_object('user_id',s.user_id,'score',s.score,'submitted_at',s.submitted_at,'id',s.id,'content',s.content,'mentor_feedback',s.mentor_feedback)) as submissions
        FROM assignments a
        LEFT JOIN submissions s ON a.id=s.assignment_id
        WHERE a.group_id=$1 AND a.lesson_date IS NOT NULL
@@ -111,21 +111,91 @@ router.put('/scores/:id', async (req, res) => {
   }
 });
 
-// Add classwork assignment
+// ── JADVAL TOZALASH (barcha scores=0 ga tushiradi) ──
+router.post('/groups/:id/schedule/clear', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    await db.query('UPDATE scores SET score=0, updated_at=NOW() WHERE group_id=$1', [req.params.id]);
+    res.json({ message: 'Jadval tozalandi' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── SUBMISSION O'CHIRISH (jadvalda baho qo'yilgan o'quvchi javobi) ──
+router.delete('/submissions/:id', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    // submission ma'lumotini olamiz
+    const sub = await db.query('SELECT * FROM submissions WHERE id=$1', [req.params.id]);
+    if (!sub.rows[0]) return res.status(404).json({ error: 'Topilmadi' });
+    const s = sub.rows[0];
+    // scores jadvalidan ham o'chiramiz
+    const asgn = await db.query('SELECT * FROM assignments WHERE id=$1', [s.assignment_id]);
+    if (asgn.rows[0]) {
+      const lessonDate = asgn.rows[0].lesson_date || asgn.rows[0].due_date;
+      await db.query(
+        'DELETE FROM scores WHERE user_id=$1 AND group_id=$2 AND lesson_date=$3',
+        [s.user_id, asgn.rows[0].group_id, lessonDate]
+      );
+    }
+    await db.query('DELETE FROM submissions WHERE id=$1', [req.params.id]);
+    res.json({ message: "Javob o'chirildi" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Add classwork assignment (kodli yoki IQ)
 router.post('/assignments/classwork', async (req, res) => {
   const db = req.app.get('db');
-  const { group_id, title, description, lesson_date, duration_minutes } = req.body;
+  const { group_id, title, description, lesson_date, duration_minutes, classwork_type, correct_answer, max_score } = req.body;
+  // classwork_type: 'code' | 'iq'
   try {
     const result = await db.query(
-      `INSERT INTO assignments (group_id, mentor_id, title, description, type, lesson_date, duration_minutes)
-       VALUES ($1,$2,$3,$4,'classwork',$5,$6) RETURNING *`,
-      [group_id, req.user.id, title, description, lesson_date, duration_minutes]
+      `INSERT INTO assignments (group_id, mentor_id, title, description, type, lesson_date, duration_minutes, classwork_type, correct_answer, max_score)
+       VALUES ($1,$2,$3,$4,'classwork',$5,$6,$7,$8,$9) RETURNING *`,
+      [group_id, req.user.id, title, description, lesson_date, duration_minutes,
+       classwork_type || 'code', correct_answer || null, max_score || 10]
     );
     
     // Auto-close after duration
     if (duration_minutes) {
       setTimeout(async () => {
-        await db.query('UPDATE assignments SET is_open=false WHERE id=$1', [result.rows[0].id]);
+        try {
+          const a = await db.query('SELECT * FROM assignments WHERE id=$1', [result.rows[0].id]);
+          if (!a.rows[0]) return;
+          await db.query('UPDATE assignments SET is_open=false WHERE id=$1', [result.rows[0].id]);
+          
+          // IQ savolda: vaqt tugaganda to'g'ri javob yuborgan o'quvchilarga avtomatik ball
+          if ((classwork_type || 'code') === 'iq' && correct_answer) {
+            const subs = await db.query('SELECT * FROM submissions WHERE assignment_id=$1', [result.rows[0].id]);
+            const ballPerCorrect = parseInt(max_score) || 10;
+            for (const sub of subs.rows) {
+              const userAnswer = (sub.content || '').trim().toLowerCase();
+              const correctAns = correct_answer.trim().toLowerCase();
+              if (userAnswer === correctAns) {
+                // Ball qo'yamiz
+                await db.query(
+                  'UPDATE submissions SET score=$1, mentor_feedback=$2 WHERE id=$3',
+                  [ballPerCorrect, "✅ To'g'ri javob!", sub.id]
+                );
+                await db.query(
+                  `INSERT INTO scores (user_id, group_id, assignment_id, score, lesson_date)
+                   VALUES ($1,$2,$3,$4,$5)
+                   ON CONFLICT (user_id, group_id, lesson_date)
+                   DO UPDATE SET score=$4, assignment_id=$3, updated_at=NOW()`,
+                  [sub.user_id, group_id, result.rows[0].id, ballPerCorrect, lesson_date]
+                );
+              } else {
+                await db.query(
+                  'UPDATE submissions SET score=0, mentor_feedback=$1 WHERE id=$2',
+                  ["❌ Noto'g'ri javob", sub.id]
+                );
+              }
+            }
+          }
+        } catch(err) { console.error('Auto-close error:', err); }
       }, duration_minutes * 60 * 1000);
     }
     
@@ -164,7 +234,6 @@ router.put('/submissions/:id/grade', async (req, res) => {
     const assignment = await db.query('SELECT * FROM assignments WHERE id=$1', [s.assignment_id]);
     const a = assignment.rows[0];
     
-    // Upsert score — ON CONFLICT by user_id+group_id+lesson_date
     const lessonDate = a.lesson_date || a.due_date;
     await db.query(
       `INSERT INTO scores (user_id, group_id, assignment_id, score, lesson_date)
@@ -180,21 +249,35 @@ router.put('/submissions/:id/grade', async (req, res) => {
   }
 });
 
-// Delete assignment
-router.delete('/assignments/:id', async (req, res) => {
+// ── BARCHA SUBMISSIONLARNI TEKSHIRISH (AI bilan) ──
+router.post('/assignments/:id/grade-all', async (req, res) => {
   const db = req.app.get('db');
   try {
-    await db.query('DELETE FROM assignments WHERE id=$1 AND mentor_id=$2', [req.params.id, req.user.id]);
-    res.json({ message: 'Vazifa o\'chirildi' });
+    const subs = await db.query(
+      `SELECT s.*, u.full_name FROM submissions s JOIN users u ON s.user_id=u.id WHERE s.assignment_id=$1 AND (s.score IS NULL OR s.score=0)`,
+      [req.params.id]
+    );
+    res.json({ count: subs.rows.length, submissions: subs.rows });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Update schedule (jadval tahrirlash)
+// Delete assignment
+router.delete('/assignments/:id', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    await db.query('DELETE FROM assignments WHERE id=$1 AND mentor_id=$2', [req.params.id, req.user.id]);
+    res.json({ message: "Vazifa o'chirildi" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Update schedule (jadval tahrirlash) — faqat bugungi dars kunida
 router.put('/groups/:id/schedule/edit', async (req, res) => {
   const db = req.app.get('db');
-  const { updates } = req.body; // array of { date, scores: [{user_id, score}] }
+  const { updates } = req.body;
   try {
     for (const update of updates) {
       for (const sc of update.scores) {
@@ -240,7 +323,7 @@ router.get('/groups/:id/attendance', async (req, res) => {
 // Save attendance for a group on a date
 router.post('/groups/:id/attendance', async (req, res) => {
   const db = req.app.get('db');
-  const { date, records } = req.body; // records: [{user_id, status}]
+  const { date, records } = req.body;
   try {
     for (const rec of records) {
       await db.query(
@@ -272,7 +355,6 @@ router.get('/groups/:id/attendance/history', async (req, res) => {
 
 // Student: get own attendance for their group
 router.get('/groups/:id/attendance/mine', async (req, res) => {
-  // This will be called from student routes
   const db = req.app.get('db');
   try {
     const att = await db.query(
@@ -285,7 +367,6 @@ router.get('/groups/:id/attendance/mine', async (req, res) => {
   }
 });
 
-
 // Start classwork timer
 router.post('/assignments/:id/start', async (req, res) => {
   const db = req.app.get('db');
@@ -296,11 +377,40 @@ router.post('/assignments/:id/start', async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Topilmadi' });
     
-    // Auto-close after duration
     const a = result.rows[0];
     if (a.duration_minutes) {
       setTimeout(async () => {
-        await db.query('UPDATE assignments SET is_open=false WHERE id=$1', [a.id]);
+        try {
+          await db.query('UPDATE assignments SET is_open=false WHERE id=$1', [a.id]);
+          
+          // IQ savolda: vaqt tugaganda avtomatik ball
+          if (a.classwork_type === 'iq' && a.correct_answer) {
+            const subs = await db.query('SELECT * FROM submissions WHERE assignment_id=$1', [a.id]);
+            const ballPerCorrect = parseInt(a.max_score) || 10;
+            for (const sub of subs.rows) {
+              const userAnswer = (sub.content || '').trim().toLowerCase();
+              const correctAns = a.correct_answer.trim().toLowerCase();
+              if (userAnswer === correctAns) {
+                await db.query(
+                  'UPDATE submissions SET score=$1, mentor_feedback=$2 WHERE id=$3',
+                  [ballPerCorrect, "✅ To'g'ri javob!", sub.id]
+                );
+                await db.query(
+                  `INSERT INTO scores (user_id, group_id, assignment_id, score, lesson_date)
+                   VALUES ($1,$2,$3,$4,$5)
+                   ON CONFLICT (user_id, group_id, lesson_date)
+                   DO UPDATE SET score=$4, assignment_id=$3, updated_at=NOW()`,
+                  [sub.user_id, a.group_id, a.id, ballPerCorrect, a.lesson_date]
+                );
+              } else {
+                await db.query(
+                  'UPDATE submissions SET score=0, mentor_feedback=$1 WHERE id=$2',
+                  ["❌ Noto'g'ri javob", sub.id]
+                );
+              }
+            }
+          }
+        } catch(err) { console.error('Auto-close error:', err); }
       }, a.duration_minutes * 60 * 1000);
     }
     res.json(result.rows[0]);
