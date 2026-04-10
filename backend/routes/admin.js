@@ -115,6 +115,22 @@ router.post('/groups', async (req, res) => {
   }
 });
 
+// Update group dates (sanani uzaytirish)
+router.put('/groups/:id', async (req, res) => {
+  const { start_date, end_date } = req.body;
+  const db = req.app.get('db');
+  try {
+    const result = await db.query(
+      `UPDATE groups SET start_date=$1, end_date=$2 WHERE id=$3 RETURNING *`,
+      [start_date, end_date, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Guruh topilmadi' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Add calendar event
 router.post('/calendar', async (req, res) => {
   const { group_id, title, event_date } = req.body;
