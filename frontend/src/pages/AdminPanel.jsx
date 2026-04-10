@@ -264,6 +264,28 @@ function AdminGroups({ groups, mentors, reload }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [editGroup, setEditGroup] = useState(null); // sanani uzaytirish uchun
+  const [editDates, setEditDates] = useState({ start_date: '', end_date: '' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMsg, setEditMsg] = useState('');
+
+  const openEditDates = (g) => {
+    setEditGroup(g);
+    setEditDates({ start_date: g.start_date?.slice(0, 10) || '', end_date: g.end_date?.slice(0, 10) || '' });
+    setEditMsg('');
+  };
+
+  const handleEditDatesSave = async () => {
+    setEditSaving(true);
+    try {
+      await API.put(`/admin/groups/${editGroup.id}`, editDates);
+      setEditMsg('✅ Sana yangilandi!');
+      setTimeout(() => { setEditGroup(null); reload(); }, 1200);
+    } catch (e) {
+      setEditMsg('❌ ' + (e.response?.data?.error || e.message));
+    }
+    setEditSaving(false);
+  };
 
   const handleAdd = async (e) => {
     e.preventDefault(); setLoading(true); setError('');
@@ -297,9 +319,37 @@ function AdminGroups({ groups, mentors, reload }) {
               <span>📅 {g.lesson_days === 'juft' ? 'Juft kunlar' : g.lesson_days === 'toq' ? 'Toq kunlar' : 'Har kuni'} — {g.lesson_time || '—'}</span>
               {g.start_date && <span>🗓️ {g.start_date?.slice(0, 10)} → {g.end_date?.slice(0, 10)}</span>}
             </div>
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: '12px', width: '100%' }} onClick={() => openEditDates(g)}>
+              📅 Sanani uzaytirish
+            </button>
           </div>
         ))}
       </div>
+
+      {editGroup && (
+        <div className="modal-overlay" onClick={() => setEditGroup(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">📅 Sanani uzaytirish — {editGroup.name}</span>
+              <button className="modal-close" onClick={() => setEditGroup(null)}>✕</button>
+            </div>
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Boshlanish sanasi</label>
+                <input className="input" type="date" value={editDates.start_date} onChange={e => setEditDates({ ...editDates, start_date: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Tugash sanasi</label>
+                <input className="input" type="date" value={editDates.end_date} onChange={e => setEditDates({ ...editDates, end_date: e.target.value })} />
+              </div>
+            </div>
+            {editMsg && <div style={{ marginBottom: '12px', fontSize: '13px', color: editMsg.startsWith('✅') ? 'var(--success)' : 'var(--danger)' }}>{editMsg}</div>}
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleEditDatesSave} disabled={editSaving || !editDates.start_date || !editDates.end_date}>
+              {editSaving ? '...' : '✅ Saqlash'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
