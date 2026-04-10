@@ -1065,7 +1065,7 @@ function AddTableDate({ group, onClose }) {
     setSaving(true);
     try {
       // Guruh start_date va end_date ni yangilash orqali jadval qo'shiladi
-      await API.put(`/admin/groups/${group.id}`, { start_date: startDate, end_date: endDate });
+      await API.put(`/mentor/groups/${group.id}/dates`, { start_date: startDate, end_date: endDate });
       setMsg(`✅ Jadval qo'shildi! ${preview?.length || 0} ta dars kuni.`);
       setTimeout(onClose, 1500);
     } catch (e) {
