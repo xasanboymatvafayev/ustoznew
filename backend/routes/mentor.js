@@ -419,6 +419,21 @@ router.post('/assignments/:id/start', async (req, res) => {
   }
 });
 
+// ── JADVAL SANASINI YANGILASH (start_date, end_date) ──
+router.put('/groups/:id/dates', async (req, res) => {
+  const db = req.app.get('db');
+  const { start_date, end_date } = req.body;
+  try {
+    // Faqat o'z guruhini yangilay oladi
+    const check = await db.query('SELECT id FROM groups WHERE id=$1 AND mentor_id=$2', [req.params.id, req.user.id]);
+    if (!check.rows[0]) return res.status(403).json({ error: 'Ruxsat yoq' });
+    await db.query('UPDATE groups SET start_date=$1, end_date=$2 WHERE id=$3', [start_date, end_date, req.params.id]);
+    res.json({ message: "Jadval sanasi yangilandi" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Mentor profile - change password
 router.put('/profile/password', async (req, res) => {
   const db = req.app.get('db');
