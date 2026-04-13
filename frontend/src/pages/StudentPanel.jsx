@@ -9,6 +9,7 @@ const Sidebar = ({ active, setActive, logout, user }) => {
     { id: 'homework', icon: '📋', label: 'Uy vazifalari' },
     { id: 'classwork', icon: '⏱️', label: 'Darsda vazifalar' },
     { id: 'schedule', icon: '📊', label: 'Jadval' },
+    { id: 'leaderboard', icon: '🏆', label: 'Reyting' },
     { id: 'chat', icon: '💬', label: 'Chat' },
     { id: 'profile', icon: '👤', label: 'Profil' },
   ];
@@ -72,6 +73,7 @@ export default function StudentPanel() {
         {active === 'homework' && <StudentHomework />}
         {active === 'classwork' && <StudentClasswork />}
         {active === 'schedule' && <StudentSchedule group={group} userId={user?.id} />}
+        {active === 'leaderboard' && <StudentLeaderboard />}
         {active === 'chat' && group
           ? <StudentChat group={group} />
           : active === 'chat' && <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>Guruhga qo'shilmagan</div>}
@@ -708,6 +710,136 @@ function StudentChat({ group }) {
 }
 
 // ── PROFILE ──
+// ── LEADERBOARD ──
+function StudentLeaderboard() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    API.get('/student/leaderboard').then(r => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  if (!data || !data.leaderboard?.length) return (
+    <div className="fade-in">
+      <div className="page-header"><h2>🏆 Reyting</h2></div>
+      <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>Hali ma'lumot yo'q</div>
+    </div>
+  );
+
+  const { leaderboard, my_id } = data;
+  const me = leaderboard.find(s => s.id === my_id);
+  const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+  const medals = ['🥇', '🥈', '🥉'];
+
+  return (
+    <div className="fade-in">
+      <div className="page-header"><h2>🏆 Guruh reytingi</h2><p>Guruh ichidagi o'rningiz</p></div>
+
+      {/* Mening o'rnim */}
+      {me && (
+        <div className="card" style={{ marginBottom: '20px', background: 'linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%)', color: '#fff', border: 'none' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ fontSize: '48px', lineHeight: 1 }}>{me.avatar_url || '🎓'}</div>
+              <div>
+                <div style={{ fontSize: '13px', opacity: 0.8, marginBottom: '2px' }}>Mening o'rnim</div>
+                <div style={{ fontSize: '28px', fontWeight: '800', fontFamily: 'var(--font2)' }}>#{me.rank}</div>
+                <div style={{ fontSize: '13px', opacity: 0.85 }}>{me.full_name}</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', display: 'flex', gap: '20px' }}>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: '800' }}>{me.total_score}</div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Jami ball</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: '800' }}>{me.avg_score ?? '—'}</div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>O'rtacha</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: '800' }}>{me.total_submissions}</div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Topshiriq</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top 3 */}
+      {leaderboard.length >= 3 && (
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'flex-end' }}>
+          {[leaderboard[1], leaderboard[0], leaderboard[2]].map((s, i) => {
+            const actualRank = i === 0 ? 1 : i === 1 ? 0 : 2;
+            const heights = ['80px', '110px', '70px'];
+            const isMe = s?.id === my_id;
+            return s ? (
+              <div key={s.id} style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: '28px', marginBottom: '4px' }}>{s.avatar_url || '🎓'}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: isMe ? 'var(--accent)' : 'var(--text)' }}>
+                  {s.full_name.split(' ')[0]}
+                  {isMe && ' 👈'}
+                </div>
+                <div style={{
+                  height: heights[i], borderRadius: '12px 12px 0 0',
+                  background: `linear-gradient(to top, ${medalColors[actualRank]}33, ${medalColors[actualRank]}88)`,
+                  border: `2px solid ${medalColors[actualRank]}`,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                }}>
+                  <div style={{ fontSize: i === 1 ? '28px' : '22px' }}>{medals[actualRank]}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: medalColors[actualRank] }}>{s.total_score}</div>
+                </div>
+              </div>
+            ) : null;
+          })}
+        </div>
+      )}
+
+      {/* To'liq jadval */}
+      <div className="card">
+        <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>Barcha o'quvchilar</h3>
+        <div className="table-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th><th>O'quvchi</th><th>Jami ball</th><th>O'rtacha</th><th>Topshiriqlar</th><th>Davomat</th>
+            </tr></thead>
+            <tbody>
+              {leaderboard.map(s => {
+                const isMe = s.id === my_id;
+                const attPct = s.total_lessons > 0 ? Math.round((s.present_count / s.total_lessons) * 100) : null;
+                return (
+                  <tr key={s.id} style={{ background: isMe ? 'rgba(91,141,238,0.08)' : '', fontWeight: isMe ? '700' : '400' }}>
+                    <td>
+                      {s.rank <= 3
+                        ? <span style={{ fontSize: '18px' }}>{medals[s.rank - 1]}</span>
+                        : <span style={{ color: 'var(--text3)' }}>#{s.rank}</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '20px' }}>{s.avatar_url || '🎓'}</span>
+                        <span>{s.full_name}{isMe && <span style={{ color: 'var(--accent)', fontSize: '12px' }}> (Men)</span>}</span>
+                      </div>
+                    </td>
+                    <td><span className="badge" style={{ background: isMe ? 'var(--accent)' : '' }}>{s.total_score}</span></td>
+                    <td style={{ color: 'var(--text2)' }}>{s.avg_score ?? '—'}</td>
+                    <td style={{ color: 'var(--text2)' }}>{s.total_submissions}</td>
+                    <td>
+                      {attPct !== null
+                        ? <span className={`tag ${attPct >= 80 ? 'tag-green' : attPct >= 60 ? 'tag-yellow' : 'tag-red'}`}>{attPct}%</span>
+                        : <span style={{ color: 'var(--text3)' }}>—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PROFILE ──
 function StudentProfile() {
   const { user } = useAuth();
   const [form, setForm] = useState({ old_password: '', new_password: '', confirm: '' });
@@ -716,8 +848,13 @@ function StudentProfile() {
   const [error, setError] = useState('');
   const [avatar, setAvatar] = useState(user?.avatar_url || '');
   const [showConfetti, setShowConfetti] = useState(false);
+  const [stats, setStats] = useState(null);
 
   const AVATARS = ['🎓','👨‍💻','👩‍💻','🦸','🧑‍🎨','🧙','🦊','🐼','🦁','🐯','🦋','🌟','🔥','💎','🚀','🎮','🎯','🏆'];
+
+  useEffect(() => {
+    API.get('/student/stats').then(r => setStats(r.data)).catch(() => {});
+  }, []);
 
   const handleChange = async (e) => {
     e.preventDefault(); setLoading(true); setMsg(''); setError('');
@@ -737,17 +874,31 @@ function StudentProfile() {
     try { await API.put('/student/profile/avatar', { avatar_url: av }); } catch {}
   };
 
+  const sub = stats?.submissions;
+  const att = stats?.attendance;
+  const weekly = stats?.weekly_progress || [];
+  const attPct = att?.total_lessons > 0 ? Math.round((att.present_count / att.total_lessons) * 100) : null;
+  const submitPct = sub?.total_assignments > 0 ? Math.round((sub.submitted / sub.total_assignments) * 100) : null;
+
+  // Progress bar component
+  const Bar = ({ value, max, color }) => {
+    const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+    return (
+      <div style={{ background: 'var(--bg2)', borderRadius: '8px', height: '8px', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '8px', transition: 'width 0.8s ease' }} />
+      </div>
+    );
+  };
+
+  const maxWeekScore = Math.max(...weekly.map(w => parseFloat(w.avg_score) || 0), 100);
+
   return (
     <div className="fade-in" style={{ position: 'relative' }}>
-      {/* Confetti */}
       {showConfetti && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999, overflow: 'hidden' }}>
           {[...Array(30)].map((_, i) => (
             <div key={i} style={{
-              position: 'absolute',
-              left: `${Math.random() * 100}%`,
-              top: '-20px',
-              fontSize: '20px',
+              position: 'absolute', left: `${Math.random() * 100}%`, top: '-20px', fontSize: '20px',
               animation: `fall ${1 + Math.random() * 2}s linear ${Math.random()}s forwards`,
             }}>
               {['🎉','⭐','🌟','✨','🎊','💫'][Math.floor(Math.random() * 6)]}
@@ -755,57 +906,135 @@ function StudentProfile() {
           ))}
         </div>
       )}
-
       <style>{`
         @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
         @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
         @keyframes glow { 0%,100%{box-shadow:0 0 10px var(--accent)} 50%{box-shadow:0 0 30px var(--accent), 0 0 60px var(--accent)} }
+        @keyframes barGrow { from{width:0} }
       `}</style>
 
       <div className="page-header"><h2>👤 Mening profilim</h2></div>
 
-      {/* Avatar card */}
+      {/* Avatar + asosiy ma'lumot */}
       <div className="card" style={{ textAlign: 'center', marginBottom: '20px', background: 'linear-gradient(135deg, var(--bg2) 0%, var(--card) 100%)' }}>
-        <div style={{ fontSize: '90px', lineHeight: 1, marginBottom: '12px', animation: 'float 3s ease-in-out infinite', display: 'inline-block' }}>
+        <div style={{ fontSize: '80px', lineHeight: 1, marginBottom: '12px', animation: 'float 3s ease-in-out infinite', display: 'inline-block' }}>
           {avatar || '🎓'}
         </div>
-        <h2 style={{ fontFamily: 'var(--font2)', marginBottom: '4px' }}>{user?.full_name}</h2>
+        <h2 style={{ fontFamily: 'var(--font2)', marginBottom: '2px' }}>{user?.full_name}</h2>
+        {stats?.rank && (
+          <div style={{ marginBottom: '8px' }}>
+            <span className="tag tag-blue" style={{ fontSize: '14px', padding: '4px 14px' }}>🏆 Guruhda #{stats.rank}-o'rin</span>
+          </div>
+        )}
         <p style={{ color: 'var(--text3)', fontSize: '13px', marginBottom: '20px' }}>O'quvchi 🎓</p>
-
         <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '12px' }}>Avatar tanlang:</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
           {AVATARS.map(av => (
-            <button key={av} onClick={() => handleAvatar(av)}
-              style={{
-                fontSize: '28px', background: avatar === av ? 'rgba(91,141,238,0.2)' : 'var(--bg2)',
-                border: avatar === av ? '2px solid var(--accent)' : '2px solid var(--border)',
-                borderRadius: '12px', padding: '8px', cursor: 'pointer', transition: 'all 0.2s',
-                transform: avatar === av ? 'scale(1.25)' : 'scale(1)',
-                animation: avatar === av ? 'glow 2s infinite' : 'none',
-              }}>{av}</button>
+            <button key={av} onClick={() => handleAvatar(av)} style={{
+              fontSize: '26px', background: avatar === av ? 'rgba(91,141,238,0.2)' : 'var(--bg2)',
+              border: avatar === av ? '2px solid var(--accent)' : '2px solid var(--border)',
+              borderRadius: '12px', padding: '6px', cursor: 'pointer', transition: 'all 0.2s',
+              transform: avatar === av ? 'scale(1.2)' : 'scale(1)',
+            }}>{av}</button>
           ))}
         </div>
       </div>
 
+      {/* Statistika kartochkalari */}
+      {sub && (
+        <div className="stats-grid" style={{ marginBottom: '20px' }}>
+          {[
+            { icon: '🏆', value: sub.total_score, label: 'Jami ball', color: 'var(--warning)' },
+            { icon: '⭐', value: sub.avg_score ?? '—', label: "O'rtacha ball", color: 'var(--accent)' },
+            { icon: '🎯', value: sub.best_score ?? '—', label: 'Eng yuqori ball', color: 'var(--success)' },
+            { icon: '💎', value: sub.excellent_count, label: '80+ ball', color: '#a855f7' },
+          ].map((s, i) => (
+            <div key={i} className="stat-card">
+              <div style={{ fontSize: '26px' }}>{s.icon}</div>
+              <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
+              <div className="stat-label">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid-2" style={{ gap: '20px', marginBottom: '20px' }}>
+        {/* Topshiriqlar va davomat progress */}
+        {sub && att && (
+          <div className="card">
+            <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '20px' }}>📈 Progress</h3>
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                <span>📋 Topshiriqlar</span>
+                <span style={{ color: 'var(--accent)', fontWeight: '700' }}>{sub.submitted}/{sub.total_assignments}</span>
+              </div>
+              <Bar value={sub.submitted} max={sub.total_assignments} color="var(--accent)" />
+            </div>
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                <span>✅ Davomat</span>
+                <span style={{ color: 'var(--success)', fontWeight: '700' }}>{att.present_count}/{att.total_lessons} ({attPct ?? 0}%)</span>
+              </div>
+              <Bar value={att.present_count} max={att.total_lessons} color="var(--success)" />
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                <span>💎 80+ ball</span>
+                <span style={{ color: '#a855f7', fontWeight: '700' }}>{sub.excellent_count}/{sub.submitted}</span>
+              </div>
+              <Bar value={sub.excellent_count} max={sub.submitted} color="#a855f7" />
+            </div>
+          </div>
+        )}
+
+        {/* Haftalik grafik */}
+        <div className="card">
+          <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>📊 Haftalik progress</h3>
+          {weekly.length > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '120px' }}>
+              {weekly.map((w, i) => {
+                const h = Math.max(8, Math.round((parseFloat(w.avg_score) / maxWeekScore) * 110));
+                const pct = Math.round(parseFloat(w.avg_score));
+                return (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: '700' }}>{pct}</div>
+                    <div style={{
+                      width: '100%', height: `${h}px`,
+                      background: i === weekly.length - 1 ? 'var(--accent)' : 'var(--accent)44',
+                      borderRadius: '6px 6px 0 0', transition: 'height 0.6s ease',
+                    }} title={`${w.week_label}: ${pct} ball`} />
+                    <div style={{ fontSize: '9px', color: 'var(--text3)' }}>{w.week_label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '30px 0', fontSize: '13px' }}>
+              Hali topshiriq yo'q
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid-2" style={{ gap: '20px' }}>
+        {/* Ma'lumotlar */}
         <div className="card">
           <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>📋 Ma'lumotlar</h3>
           {[
             { label: 'Ism Familya', value: user?.full_name, icon: '👤' },
             { label: 'Email', value: user?.email, icon: '📧' },
           ].map((item, i) => (
-            <div key={i} style={{ padding: '12px', background: 'var(--bg2)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '10px', transition: 'all 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+            <div key={i} style={{ padding: '12px', background: 'var(--bg2)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>{item.icon} {item.label}</div>
               <div style={{ fontWeight: '600' }}>{item.value || '—'}</div>
             </div>
           ))}
         </div>
 
+        {/* Parol o'zgartirish */}
         <div className="card">
           <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>🔒 Parol o'zgartirish</h3>
-          {msg && <div className="alert alert-success" style={{ animation: 'fadeIn 0.3s' }}>{msg}</div>}
+          {msg && <div className="alert alert-success">{msg}</div>}
           {error && <div className="alert alert-error">{error}</div>}
           <form onSubmit={handleChange}>
             <div className="form-group"><label>Eski parol</label>
