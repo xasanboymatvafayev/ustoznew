@@ -212,4 +212,116 @@ router.get('/schedule', async (req, res) => {
   }
 });
 
+// 🏆 LEADERBOARD — guruh ichida reyting
+router.get('/leaderboard', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const grpRes = await db.query(
+      `SELECT g.id FROM group_members gm JOIN groups g ON gm.group_id=g.id WHERE gm.user_id=$1 LIMIT 1`,
+      [req.user.id]
+    );
+    if (!grpRes.rows.length) return res.json([]);
+    const groupId = grpRes.rows[0].id;
+
+    const result = await db.query(`
+      SELECT
+        u.id, u.full_name, u.avatar_url,
+        COUNT(DISTINCT s.id) FILTER (WHERE s.score IS NOT NULL)          AS total_submissions,
+        COALESCE(SUM(s.score), 0)                                        AS total_score,
+        ROUND(AVG(s.score) FILTER (WHERE s.score IS NOT NULL), 1)        AS avg_score,
+        COUNT(DISTINCT att.lesson_date) FILTER (WHERE att.status='present') AS present_count,
+        COUNT(DISTINCT att.lesson_date)                                   AS total_lessons
+      FROM group_members gm
+      JOIN users u ON gm.user_id = u.id
+      LEFT JOIN submissions s ON s.user_id = u.id
+        AND s.assignment_id IN (SELECT id FROM assignments WHERE group_id = $1)
+      LEFT JOIN attendance att ON att.user_id = u.id AND att.group_id = $1
+      WHERE gm.group_id = $1
+      GROUP BY u.id, u.full_name, u.avatar_url
+      ORDER BY total_score DESC, avg_score DESC
+    `, [groupId]);
+
+    const rows = result.rows.map((r, i) => ({ ...r, rank: i + 1 }));
+    res.json({ leaderboard: rows, my_id: req.user.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 📊 PROFILE STATS — shaxsiy statistika
+router.get('/stats', async (req, res) => {
+  const db = req.app.get('db');
+  const uid = req.user.id;
+  try {
+    const grpRes = await db.query(
+      `SELECT g.id FROM group_members gm JOIN groups g ON gm.group_id=g.id WHERE gm.user_id=$1 LIMIT 1`,
+      [uid]
+    );
+    const groupId = grpRes.rows[0]?.id || null;
+
+    // Topshiriqlar statistikasi
+    const subStats = await db.query(`
+      SELECT
+        COUNT(DISTINCT a.id)                                              AS total_assignments,
+        COUNT(DISTINCT s.id)                                              AS submitted,
+        COALESCE(SUM(s.score), 0)                                        AS total_score,
+        ROUND(AVG(s.score) FILTER (WHERE s.score IS NOT NULL), 1)        AS avg_score,
+        MAX(s.score)                                                      AS best_score,
+        COUNT(DISTINCT s.id) FILTER (WHERE s.score >= 80)                AS excellent_count
+      FROM assignments a
+      JOIN group_members gm ON a.group_id = gm.group_id AND gm.user_id = $1
+      LEFT JOIN submissions s ON s.assignment_id = a.id AND s.user_id = $1
+    `, [uid]);
+
+    // Davomat statistikasi
+    const attStats = await db.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status='present') AS present_count,
+        COUNT(*) FILTER (WHERE status='absent')  AS absent_count,
+        COUNT(*)                                  AS total_lessons
+      FROM attendance WHERE user_id=$1 ${groupId ? 'AND group_id=$2' : ''}
+    `, groupId ? [uid, groupId] : [uid]);
+
+    // So'nggi 6 haftadagi ballar (progress grafigi uchun)
+    const weekly = await db.query(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('week', s.submitted_at), 'DD.MM') AS week_label,
+        ROUND(AVG(s.score), 1) AS avg_score,
+        COUNT(*) AS count
+      FROM submissions s
+      JOIN assignments a ON a.id = s.assignment_id
+      JOIN group_members gm ON a.group_id = gm.group_id AND gm.user_id = $1
+      WHERE s.user_id = $1 AND s.submitted_at >= NOW() - INTERVAL '6 weeks'
+      GROUP BY DATE_TRUNC('week', s.submitted_at)
+      ORDER BY DATE_TRUNC('week', s.submitted_at)
+    `, [uid]);
+
+    // Guruh ichidagi reyting o'rni
+    let rank = null;
+    if (groupId) {
+      const rankRes = await db.query(`
+        SELECT rank FROM (
+          SELECT u.id, RANK() OVER (ORDER BY COALESCE(SUM(s.score),0) DESC) AS rank
+          FROM group_members gm
+          JOIN users u ON gm.user_id=u.id
+          LEFT JOIN submissions s ON s.user_id=u.id
+            AND s.assignment_id IN (SELECT id FROM assignments WHERE group_id=$1)
+          WHERE gm.group_id=$1
+          GROUP BY u.id
+        ) ranked WHERE id=$2
+      `, [groupId, uid]);
+      rank = rankRes.rows[0]?.rank || null;
+    }
+
+    res.json({
+      submissions: subStats.rows[0],
+      attendance: attStats.rows[0],
+      weekly_progress: weekly.rows,
+      rank
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
