@@ -162,4 +162,47 @@ router.get('/students', async (req, res) => {
   }
 });
 
+// Update student (full_name, login, group_name)
+router.put('/students/:id', async (req, res) => {
+  const db = req.app.get('db');
+  const { full_name, login, group_name } = req.body;
+  const studentId = req.params.id;
+  try {
+    // login unique tekshirish (o'zi bundan mustasno)
+    if (login) {
+      const existing = await db.query('SELECT id FROM users WHERE login=$1 AND id!=$2', [login, studentId]);
+      if (existing.rows.length) return res.status(409).json({ error: 'Bu username allaqachon band' });
+    }
+
+    // users jadvalini yangilash
+    await db.query(
+      `UPDATE users SET
+        full_name = COALESCE($1, full_name),
+        login     = COALESCE($2, login),
+        group_name= COALESCE($3, group_name)
+       WHERE id = $4`,
+      [full_name || null, login || null, group_name || null, studentId]
+    );
+
+    // Guruh o'zgargan bo'lsa group_members ni ham yangilash
+    if (group_name) {
+      const grp = await db.query('SELECT id FROM groups WHERE name=$1', [group_name]);
+      if (!grp.rows.length) return res.status(400).json({ error: 'Guruh topilmadi' });
+      const newGroupId = grp.rows[0].id;
+
+      // Eski group_members yozuvini o'chirish
+      await db.query('DELETE FROM group_members WHERE user_id=$1', [studentId]);
+      // Yangi guruhga qo'shish
+      await db.query(
+        'INSERT INTO group_members (group_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+        [newGroupId, studentId]
+      );
+    }
+
+    res.json({ message: "O'quvchi yangilandi" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
