@@ -87,7 +87,7 @@ export default function AdminPanel() {
             {active === 'dashboard' && <AdminDashboard stats={stats} setActive={setActive} />}
             {active === 'mentors' && <AdminMentors mentors={mentors} groups={groups} reload={loadData} />}
             {active === 'groups' && <AdminGroups groups={groups} mentors={mentors} reload={loadData} />}
-            {active === 'students' && <AdminStudents students={students} />}
+            {active === 'students' && <AdminStudents students={students} reload={loadData} />}
             {active === 'calendar' && <AdminCalendar groups={groups} />}
           </>
         )}
@@ -411,38 +411,136 @@ function AdminGroups({ groups, mentors, reload }) {
 }
 
 // ===== STUDENTS =====
-function AdminStudents({ students }) {
+function AdminStudents({ students, reload }) {
   const [search, setSearch] = useState('');
+  const [editStudent, setEditStudent] = useState(null);
+  const [editForm, setEditForm] = useState({ full_name: '', login: '', group_name: '' });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
+
   const filtered = students.filter(s =>
     s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase())
+    s.email.toLowerCase().includes(search.toLowerCase()) ||
+    (s.login || '').toLowerCase().includes(search.toLowerCase()) ||
+    (s.group_name || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const openEdit = (s) => {
+    setEditStudent(s);
+    setEditForm({ full_name: s.full_name, login: s.login || '', group_name: s.group_name || '' });
+    setEditError('');
+    setEditSuccess('');
+  };
+
+  const handleEditSave = async () => {
+    setEditLoading(true); setEditError(''); setEditSuccess('');
+    try {
+      await API.put(`/admin/students/${editStudent.id}`, editForm);
+      setEditSuccess("✅ O'quvchi yangilandi!");
+      setTimeout(() => { setEditStudent(null); reload(); }, 1000);
+    } catch (e) {
+      setEditError(e.response?.data?.error || 'Xatolik yuz berdi');
+    }
+    setEditLoading(false);
+  };
 
   return (
     <div className="fade-in">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div><h2>O'quvchilar</h2><p>{students.length} ta ro'yxatdan o'tgan</p></div>
-        <input className="input" style={{ width: '250px' }} placeholder="🔍 Qidirish..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="input" style={{ width: '260px' }} placeholder="🔍 Ism, email, username, guruh..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
+
       <div className="table-wrap">
         <table>
           <thead><tr>
-            <th>#</th><th>Ism Familya</th><th>Email</th><th>Telefon</th><th>Guruh</th><th>Sana</th>
+            <th>#</th><th>Ism Familya</th><th>Username</th><th>Email</th><th>Telefon</th><th>Guruh</th><th>Sana</th><th>Amal</th>
           </tr></thead>
           <tbody>
             {filtered.map((s, i) => (
               <tr key={s.id}>
                 <td style={{ color: 'var(--text3)' }}>{i + 1}</td>
                 <td><b>{s.full_name}</b></td>
+                <td style={{ color: 'var(--text2)', fontFamily: 'monospace', fontSize: '12px' }}>{s.login || '—'}</td>
                 <td style={{ color: 'var(--text2)' }}>{s.email}</td>
                 <td style={{ color: 'var(--text2)' }}>{s.phone}</td>
                 <td>{s.group_name ? <span className="tag tag-blue">{s.group_name}</span> : '—'}</td>
                 <td style={{ color: 'var(--text3)', fontSize: '12px' }}>{s.created_at?.slice(0, 10)}</td>
+                <td>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openEdit(s)}>
+                    ✏️ Tahrirlash
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>
+            🔍 Hech narsa topilmadi
+          </div>
+        )}
       </div>
+
+      {editStudent && (
+        <div className="modal-overlay" onClick={() => setEditStudent(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">✏️ O'quvchini tahrirlash</span>
+              <button className="modal-close" onClick={() => setEditStudent(null)}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: '16px', padding: '10px 12px', background: 'var(--bg2)', borderRadius: '8px', fontSize: '13px', color: 'var(--text2)' }}>
+              📧 {editStudent.email} &nbsp;|&nbsp; 📞 {editStudent.phone}
+            </div>
+
+            {editError && <div className="alert alert-error">{editError}</div>}
+            {editSuccess && <div className="alert alert-success">{editSuccess}</div>}
+
+            <div className="form-group">
+              <label>Ism Familya</label>
+              <input
+                className="input"
+                value={editForm.full_name}
+                onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
+                placeholder="Karimov Karim"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Username (login)</label>
+              <input
+                className="input"
+                value={editForm.login}
+                onChange={e => setEditForm({ ...editForm, login: e.target.value })}
+                placeholder="karimov_karim"
+                style={{ fontFamily: 'monospace' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Guruh nomi</label>
+              <input
+                className="input"
+                value={editForm.group_name}
+                onChange={e => setEditForm({ ...editForm, group_name: e.target.value })}
+                placeholder="G-01"
+              />
+              <small style={{ color: 'var(--text3)', fontSize: '11px' }}>Mavjud guruh nomi kiriting</small>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+              onClick={handleEditSave}
+              disabled={editLoading || !editForm.full_name}
+            >
+              {editLoading ? '...' : '✅ Saqlash'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
