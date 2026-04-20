@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import API from '../utils/api';
 
-const GROQ_KEY = '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';
+const GROQ_KEY = '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';
 
 const geminiCheck = async (assignmentTitle, studentAnswer) => {
   if (!GROQ_KEY) throw new Error('Groq API key sozlanmagan.');
