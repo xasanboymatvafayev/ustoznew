@@ -151,24 +151,39 @@ router.post('/login/admin', async (req, res) => {
   const { username, password, center_id } = req.body;
   const db = req.app.get('db');
   try {
-    // center_id bilan admins jadvalidan qidirish
     let result;
     if (center_id) {
-      result = await db.query(
-        'SELECT * FROM admins WHERE username=$1 AND center_id=$2 AND is_active=true',
-        [username, center_id]
-      );
+      // center_id berilgan bo'lsa - shu markaz admini
+      // username berilgan bo'lsa username bilan, bo'lmasa faqat center_id bilan
+      if (username) {
+        result = await db.query(
+          'SELECT * FROM admins WHERE (username=$1 OR login=$1) AND center_id=$2 AND is_active=true',
+          [username, center_id]
+        );
+      } else {
+        result = await db.query(
+          'SELECT * FROM admins WHERE center_id=$1 AND is_active=true ORDER BY id LIMIT 1',
+          [center_id]
+        );
+      }
     } else {
+      // center_id yo'q - global admin (eski tizim)
       result = await db.query(
-        'SELECT * FROM admins WHERE username=$1 AND is_active=true',
-        [username]
+        'SELECT * FROM admins WHERE (username=$1 OR login=$1) AND (center_id IS NULL) AND is_active=true',
+        [username || '']
       );
+      if (!result.rows.length) {
+        result = await db.query(
+          'SELECT * FROM admins WHERE username=$1',
+          [username || '']
+        );
+      }
     }
     if (!result.rows.length) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
 
     const admin = result.rows[0];
     const valid = await bcrypt.compare(password, admin.password_hash);
-    if (!valid) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
+    if (!valid) return res.status(401).json({ error: "Parol noto'g'ri" });
 
     const token = jwt.sign(
       { id: admin.id, role: 'admin', center_id: admin.center_id },
