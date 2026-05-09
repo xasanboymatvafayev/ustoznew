@@ -145,10 +145,12 @@ router.post('/centers', superAuth, async (req, res) => {
 
     const center = centerRes.rows[0];
 
-    // Admin akkauntini yaratish (username va login ikkalasini ham saqlaymiz)
+    // Admin akkauntini yaratish (ON CONFLICT bilan)
     await db.query(`
       INSERT INTO admins (username, login, password_hash, center_id, full_name, is_active)
       VALUES ($1, $1, $2, $3, $4, true)
+      ON CONFLICT (username) DO UPDATE
+        SET password_hash=$2, center_id=$3, full_name=$4, is_active=true
     `, [admin_login, passHash, center.id, admin_name]);
 
     // Agar pro/unlimited → to'lov yaratish
@@ -262,6 +264,37 @@ router.put('/payments/:id/mark-paid', superAuth, async (req, res) => {
     // Markaz faollashtirish
     await db.query(`UPDATE centers SET is_active=true WHERE id=$1`, [payRes.rows[0].center_id]);
     res.json({ success: true, message: 'To\'lov tasdiqlandi, markaz faollashtirildi' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// DELETE /api/superadmin/centers/:id — Markazni o'chirish
+// ──────────────────────────────────────────────────────────────────────────
+router.delete('/centers/:id', superAuth, async (req, res) => {
+  const db = req.app.get('db');
+  const { id } = req.params;
+  try {
+    // Avval shu markazga tegishli adminlarni o'chiramiz
+    await db.query(`DELETE FROM admins WHERE center_id=$1`, [id]);
+    // Keyin markazni o'chiramiz
+    const result = await db.query(`DELETE FROM centers WHERE id=$1 RETURNING name`, [id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Markaz topilmadi' });
+    res.json({ success: true, message: `"${result.rows[0].name}" markazi o'chirildi` });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// POST /api/superadmin/clear — Barcha markazlar va foydalanuvchilarni tozalash
+// ──────────────────────────────────────────────────────────────────────────
+router.post('/clear', superAuth, async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    await db.query(`DELETE FROM center_payments`);
+    await db.query(`DELETE FROM admins WHERE center_id IS NOT NULL`);
+    await db.query(`DELETE FROM centers`);
+    // Sequence ni qayta boshlash
+    await db.query(`ALTER SEQUENCE IF EXISTS centers_id_seq RESTART WITH 1001`);
+    res.json({ success: true, message: "Barcha markazlar o'chirildi" });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
