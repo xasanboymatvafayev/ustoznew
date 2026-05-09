@@ -210,7 +210,7 @@ tr:hover td{background:var(--surface2)}
 </div>
 
 <!-- ===== PANEL ===== -->
-<div id="panel" style="display:none;width:100%;display:flex">
+<div id="panel" style="display:none;width:100%">
 
   <!-- SIDEBAR -->
   <div class="sidebar">
@@ -461,6 +461,13 @@ tr:hover td{background:var(--surface2)}
             </button>
           </div>
         </div>
+        <div class="table-wrap" style="padding:20px;margin-top:16px;border:1px solid #e53e3e">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:8px;color:#e53e3e">🗑️ Ma'lumotlarni tozalash</h3>
+          <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Diqqat: Bu amalni bajarganingizda barcha markazlar, to'lovlar va sozlamalar o'chiriladi!</p>
+          <button class="btn" style="background:#e53e3e;color:#fff" onclick="clearAllData()">
+            <i class="fa fa-trash"></i> Hamma ma'lumotlarni o'chirish
+          </button>
+        </div>
         <div class="table-wrap" style="padding:20px;margin-top:16px">
           <h3 style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text)">ℹ️ Tizim URL shabloni</h3>
           <p style="font-size:12px;color:var(--text3);margin-bottom:10px">O'quv markaz qo'shilganda quyidagi URL avtomatik generatsiya qilinadi:</p>
@@ -593,147 +600,160 @@ tr:hover td{background:var(--surface2)}
       <button class="modal-close" onclick="closeModal('modalCenterDetail')"><i class="fa fa-times"></i></button>
     </div>
     <div class="modal-body" id="cdBody"></div>
-    <div class="modal-footer">
+    <div class="modal-footer" id="cdActions">
       <button class="btn btn-ghost" onclick="closeModal('modalCenterDetail')">Yopish</button>
     </div>
   </div>
 </div>
 
 <script>
-// ==================== STATE ====================
-const BOSS_USER = 'boss_admin';
-const BOSS_PASS_KEY = 'boss_pass';
-const DEFAULT_PASS = 'ustoz2026';
-
-let state = {
-  loggedIn: false,
-  centers: [],
-  packages: {
-    free:      { name:'Free',      price:0,       groups:1,  mentors:1,  students:10 },
-    pro:       { name:'Pro',       price:499000,  groups:20, mentors:-1, students:400 },
-    unlimited: { name:'Unlimited', price:1000000, groups:-1, mentors:-1, students:-1 },
-  },
-  payments: [],
-  config: { shopId:'', shopKey:'', apiUrl:'https://tolovavto.up.railway.app/api', baseUrl:'' },
-  nextId: 1001,
-};
-
-// ==================== PERSIST ====================
-function saveState(){
-  localStorage.setItem('boss_state', JSON.stringify(state));
-}
-function loadState(){
-  const s = localStorage.getItem('boss_state');
-  if(s) state = { ...state, ...JSON.parse(s) };
-}
+// ==================== CONFIG ====================
+// API URL: o'z server addressingizni kiriting
+const API = window.location.origin + '/api/superadmin';
+let superToken = sessionStorage.getItem('super_token') || '';
 
 // ==================== AUTH ====================
-function doLogin(){
+async function doLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value;
-  const storedPass = localStorage.getItem(BOSS_PASS_KEY) || DEFAULT_PASS;
-  if(u === BOSS_USER && p === storedPass){
-    state.loggedIn = true;
+  const el = document.getElementById('loginError');
+  el.style.display = 'none';
+  
+  try {
+    const res = await fetch(API + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Xatolik');
+    
+    superToken = data.token;
+    sessionStorage.setItem('super_token', superToken);
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('panel').style.display = 'flex';
     initPanel();
-  } else {
-    const el = document.getElementById('loginError');
+  } catch(e) {
     el.style.display = 'block';
-    el.textContent = 'Login yoki parol noto\'g\'ri!';
+    el.textContent = e.message;
   }
 }
-function doLogout(){
-  state.loggedIn = false;
+
+function doLogout() {
+  superToken = '';
+  sessionStorage.removeItem('super_token');
   document.getElementById('panel').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('loginPass').value = '';
 }
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + superToken,
+      ...(opts.headers || {})
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const data = await res.json();
+  if (res.status === 401) { doLogout(); throw new Error('Sessiya tugadi'); }
+  if (!res.ok) throw new Error(data.error || 'Server xatosi');
+  return data;
+}
+
 document.getElementById('loginPass').addEventListener('keyup', e => { if(e.key==='Enter') doLogin(); });
 
 // ==================== INIT ====================
-function initPanel(){
-  loadState();
+function initPanel() {
   updateDate();
   setInterval(updateDate, 60000);
   renderDashboard();
-  renderPackages();
-  loadSettings();
 }
-function updateDate(){
+
+function updateDate() {
   const now = new Date();
   document.getElementById('topbarDate').textContent = now.toLocaleDateString('uz-UZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 }
 
 // ==================== NAV ====================
-const titles = { dashboard:'Dashboard 📊', centers:'O\'quv Markazlar 🏢', payments:'To\'lovlar 💳', packages:'Paketlar 📦', settings:'Sozlamalar ⚙️' };
-function showPage(page, el){
+const titles = { dashboard:'Dashboard 📊', centers:"O'quv Markazlar 🏢", payments:"To'lovlar 💳", packages:'Paketlar 📦', settings:'Sozlamalar ⚙️' };
+function showPage(page, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
-  if(el) el.classList.add('active');
+  document.getElementById('page-' + page).classList.add('active');
+  if (el) el.classList.add('active');
   document.getElementById('topbarTitle').textContent = titles[page] || page;
-  if(page==='dashboard') renderDashboard();
-  if(page==='centers') renderCenters();
-  if(page==='payments') renderPayments();
-  if(page==='packages') renderPackages();
-  if(page==='settings') loadSettings();
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'centers') loadCenters();
+  if (page === 'payments') loadPayments('');
+  if (page === 'packages') loadPackages();
+  if (page === 'settings') loadSettings();
 }
 
 // ==================== DASHBOARD ====================
-function renderDashboard(){
-  const active = state.centers.filter(c=>c.active).length;
-  const pendingPay = state.payments.filter(p=>p.status==='pending').length;
-  const totalIncome = state.payments.filter(p=>p.status==='paid').reduce((a,b)=>a+(b.amount||0),0);
-  const totalStudents = state.centers.reduce((a,b)=>a+(b.studentsCount||0),0);
+async function renderDashboard() {
+  try {
+    const d = await api('/dashboard');
+    document.getElementById('ds-total').textContent = d.total_centers;
+    document.getElementById('ds-active-c').textContent = d.active_centers + ' faol';
+    document.getElementById('ds-income').textContent = fmtNum(d.month_income);
+    document.getElementById('ds-pending').textContent = d.pending_payments;
+    document.getElementById('ds-students').textContent = d.total_students;
+    document.getElementById('centersCount').textContent = d.total_centers;
+    document.getElementById('pendingCount').textContent = d.pending_payments;
 
-  document.getElementById('ds-total').textContent = state.centers.length;
-  document.getElementById('ds-active-c').textContent = active + ' faol';
-  document.getElementById('ds-income').textContent = fmtNum(totalIncome);
-  document.getElementById('ds-pending').textContent = pendingPay;
-  document.getElementById('ds-students').textContent = totalStudents;
-  document.getElementById('centersCount').textContent = state.centers.length;
-  document.getElementById('pendingCount').textContent = pendingPay;
-
-  // recent 5
-  const tbody = document.getElementById('recentCenters');
-  const recent = [...state.centers].reverse().slice(0,5);
-  if(!recent.length){ tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">Hali markaz yo'q. Yangi markaz qo'shing!</td></tr>`; return; }
-  tbody.innerHTML = recent.map(c => `
-    <tr>
-      <td><span class="center-id">#${c.id}</span></td>
-      <td><span class="center-name">${c.name}</span></td>
-      <td>${pkgChip(c.package)}</td>
-      <td>${c.active ? '<span class="chip active">Faol</span>' : '<span class="chip inactive">Nofaol</span>'}</td>
-      <td>${c.trialEnds ? '<span class="chip trial">'+daysLeft(c.trialEnds)+' kun qoldi</span>' : '—'}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="copyUrl('${c.id}')"><i class="fa fa-copy"></i> URL</button></td>
-    </tr>`).join('');
+    const tbody = document.getElementById('recentCenters');
+    if (!d.recent_centers.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">Hali markaz yo'q. Yangi markaz qo'shing!</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = d.recent_centers.map(c => `
+      <tr>
+        <td><span class="center-id">#${c.id}</span></td>
+        <td><span class="center-name">${c.name}</span></td>
+        <td>${pkgChip(c.package_key || c.package_name)}</td>
+        <td>${c.is_active ? '<span class="chip active">Faol</span>' : '<span class="chip inactive">Nofaol</span>'}</td>
+        <td>${c.trial_ends_at ? '<span class="chip trial">'+daysLeft(c.trial_ends_at)+' kun qoldi</span>' : '—'}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="copyUrl(${c.id})"><i class="fa fa-copy"></i> URL</button></td>
+      </tr>`).join('');
+  } catch(e) {
+    console.error('Dashboard error:', e);
+  }
 }
 
 // ==================== CENTERS ====================
-let filteredCenters = [];
-function renderCenters(list){
-  filteredCenters = list || state.centers;
+let allCenters = [];
+async function loadCenters() {
+  try {
+    allCenters = await api('/centers');
+    renderCenters(allCenters);
+  } catch(e) {
+    document.getElementById('centersTable').innerHTML = `<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:24px">Xatolik: ${e.message}</td></tr>`;
+  }
+}
+
+function renderCenters(list) {
   const tbody = document.getElementById('centersTable');
-  if(!filteredCenters.length){
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">
-      Markaz topilmadi. <button class="btn btn-primary btn-sm" onclick="openAddCenter()">Qo'shish</button></td></tr>`;
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">Markaz topilmadi. <button class="btn btn-primary btn-sm" onclick="openAddCenter()">Qo'shish</button></td></tr>`;
     return;
   }
-  tbody.innerHTML = filteredCenters.map(c => `
+  tbody.innerHTML = list.map(c => `
     <tr>
       <td><span class="center-id">#${c.id}</span></td>
       <td><div class="center-name">${c.name}</div><div style="font-size:11px;color:var(--text3)">${c.city||''}</div></td>
-      <td><div style="font-size:12px">${c.adminName}</div><div style="font-size:11px;color:var(--text3)">${c.phone}</div></td>
-      <td>${pkgChip(c.package)}</td>
-      <td><span style="font-weight:600;color:var(--accent2)">${c.studentsCount||0}</span></td>
-      <td>${payStatusBadge(c)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="copyUrl('${c.id}')"><i class="fa fa-copy"></i></button></td>
+      <td><div style="font-size:12px">${c.admin_name}</div><div style="font-size:11px;color:var(--text3)">${c.phone}</div></td>
+      <td>${pkgChip(c.package_key || c.package_name)}</td>
+      <td><span style="font-weight:600;color:var(--accent2)">${c.student_count||0}</span></td>
+      <td>${c.payment_status === 'paid' ? '<span class="chip active">To\'langan</span>' : c.payment_status === 'pending' ? '<span class="chip pending">Kutilmoqda</span>' : '—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="copyUrl(${c.id})"><i class="fa fa-copy"></i></button></td>
       <td>
         <div class="actions">
           <button class="btn btn-ghost btn-sm" onclick="viewCenter(${c.id})" title="Ko'rish"><i class="fa fa-eye"></i></button>
-          <button class="btn ${c.active?'btn-danger':'btn-success'} btn-sm" onclick="toggleCenter(${c.id})">
-            ${c.active?'<i class="fa fa-ban"></i>':'<i class="fa fa-check"></i>'}
+          <button class="btn ${c.is_active?'btn-danger':'btn-success'} btn-sm" onclick="toggleCenter(${c.id})">
+            ${c.is_active?'<i class="fa fa-ban"></i>':'<i class="fa fa-check"></i>'}
           </button>
           <button class="btn btn-ghost btn-sm" onclick="changePkg(${c.id})" title="Paket"><i class="fa fa-box"></i></button>
         </div>
@@ -741,137 +761,109 @@ function renderCenters(list){
     </tr>`).join('');
 }
 
-function filterCenters(q){
-  const f = state.centers.filter(c =>
-    c.name.toLowerCase().includes(q.toLowerCase()) ||
-    String(c.id).includes(q)
-  );
+function filterCenters(q) {
+  const f = allCenters.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) || String(c.id).includes(q));
   renderCenters(f);
 }
-function filterCentersByPkg(pkg){
-  const f = pkg ? state.centers.filter(c=>c.package===pkg) : state.centers;
+function filterCentersByPkg(pkg) {
+  const f = pkg ? allCenters.filter(c => (c.package_key||c.package_name) === pkg) : allCenters;
   renderCenters(f);
 }
-function filterCentersByStatus(st){
-  const f = st ? state.centers.filter(c=> st==='active' ? c.active : !c.active) : state.centers;
+function filterCentersByStatus(st) {
+  const f = st ? allCenters.filter(c => st === 'active' ? c.is_active : !c.is_active) : allCenters;
   renderCenters(f);
 }
 
-function openAddCenter(){
-  document.getElementById('ac-name').value='';
-  document.getElementById('ac-city').value='';
-  document.getElementById('ac-admin-name').value='';
-  document.getElementById('ac-phone').value='';
-  document.getElementById('ac-login').value='admin';
-  document.getElementById('ac-pass').value='';
-  document.getElementById('ac-package').value='free';
-  document.getElementById('ac-trial').value='30';
-  updateUrlPreview();
+function openAddCenter() {
+  document.getElementById('ac-name').value = '';
+  document.getElementById('ac-city').value = '';
+  document.getElementById('ac-admin-name').value = '';
+  document.getElementById('ac-phone').value = '';
+  document.getElementById('ac-login').value = 'admin';
+  document.getElementById('ac-pass').value = '';
+  document.getElementById('ac-package').value = 'free';
+  document.getElementById('ac-trial').value = '30';
+  document.getElementById('ac-url-val').textContent = 'ID avtomatik beriladi';
   openModal('modalAddCenter');
 }
-function updateUrlPreview(){
-  const base = state.config.baseUrl || 'https://your-app.up.railway.app';
-  document.getElementById('ac-url-val').textContent = `${base}/center/${state.nextId}`;
-}
 
-async function addCenter(){
+async function addCenter() {
   const name = document.getElementById('ac-name').value.trim();
   const city = document.getElementById('ac-city').value.trim();
-  const adminName = document.getElementById('ac-admin-name').value.trim();
+  const admin_name = document.getElementById('ac-admin-name').value.trim();
   const phone = document.getElementById('ac-phone').value.trim();
-  const login = document.getElementById('ac-login').value.trim();
-  const pass = document.getElementById('ac-pass').value;
-  const pkg = document.getElementById('ac-package').value;
-  const trial = parseInt(document.getElementById('ac-trial').value)||0;
+  const admin_login = document.getElementById('ac-login').value.trim();
+  const admin_password = document.getElementById('ac-pass').value;
+  const package_key = document.getElementById('ac-package').value;
+  const trial_days = parseInt(document.getElementById('ac-trial').value) || 0;
 
-  if(!name||!adminName||!phone||!login||!pass){
-    showAlert('addCenterAlert','error','Barcha majburiy maydonlarni to\'ldiring!');
+  if (!name || !admin_name || !phone || !admin_login || !admin_password) {
+    showAlert('addCenterAlert', 'error', "Barcha majburiy maydonlarni to'ldiring!");
     return;
   }
 
-  const id = state.nextId++;
-  const trialEnds = trial > 0 ? new Date(Date.now() + trial*86400000).toISOString() : null;
-
-  const center = {
-    id, name, city, adminName, phone, login,
-    passHash: btoa(pass), // Simple encoding for demo; use bcrypt on server
-    package: pkg,
-    active: true,
-    trialEnds,
-    studentsCount: 0,
-    createdAt: new Date().toISOString(),
-    url: `${state.config.baseUrl||'https://your-app.up.railway.app'}/center/${id}`
-  };
-
-  state.centers.push(center);
-
-  // Auto-create pending payment if pro/unlimited
-  if(pkg !== 'free'){
-    const pkgData = state.packages[pkg];
-    state.payments.push({
-      id: Date.now(),
-      centerId: id,
-      centerName: name,
-      package: pkg,
-      amount: pkgData.price,
-      month: new Date().toISOString().slice(0,7),
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      paidAt: null,
-      orderId: null,
+  try {
+    const result = await api('/centers', {
+      method: 'POST',
+      body: { name, city, admin_name, phone, admin_login, admin_password, package_key, trial_days }
     });
+    closeModal('modalAddCenter');
+    alert(`✅ Markaz qo'shildi!
+
+ID: #${result.center.id}
+URL: ${result.url}
+
+Admin login: ${admin_login}
+Admin parol: (kiritilgan parol)
+
+Bu URLni markaz adminiga yuboring!`);
+    loadCenters();
+    renderDashboard();
+  } catch(e) {
+    showAlert('addCenterAlert', 'error', e.message);
   }
-
-  saveState();
-  closeModal('modalAddCenter');
-  showAlert('addCenterAlert','success','');
-
-  // Show success with URL
-  const base = state.config.baseUrl || 'https://your-app.up.railway.app';
-  alert(`✅ Markaz qo'shildi!\n\nID: #${id}\nURL: ${base}/center/${id}\n\nAdmin login: ${login}\nAdmin parol: (kiritilgan parol)\n\nBu URLni markaz adminiga yuboring!`);
-
-  renderDashboard();
-  renderCenters();
-  document.getElementById('centersCount').textContent = state.centers.length;
 }
 
-function toggleCenter(id){
-  const c = state.centers.find(x=>x.id===id);
-  if(!c) return;
-  c.active = !c.active;
-  saveState();
-  renderCenters();
-  renderDashboard();
+async function toggleCenter(id) {
+  try {
+    await api(`/centers/${id}/toggle`, { method: 'PUT' });
+    loadCenters();
+    renderDashboard();
+  } catch(e) {
+    alert('Xatolik: ' + e.message);
+  }
 }
 
-function changePkg(id){
-  const c = state.centers.find(x=>x.id===id);
-  if(!c) return;
-  const newPkg = prompt(`Yangi paket (#${id} - ${c.name}):\nfree, pro, unlimited`, c.package);
-  if(!newPkg || !['free','pro','unlimited'].includes(newPkg)) return;
-  c.package = newPkg;
-  saveState();
-  renderCenters();
+async function changePkg(id) {
+  const c = allCenters.find(x => x.id === id);
+  if (!c) return;
+  const newPkg = prompt(`Yangi paket (#${id} - ${c.name}):\nfree, pro, unlimited`, c.package_key || c.package_name);
+  if (!newPkg || !['free','pro','unlimited'].includes(newPkg)) return;
+  try {
+    await api(`/centers/${id}`, { method: 'PUT', body: { package_key: newPkg } });
+    loadCenters();
+  } catch(e) {
+    alert('Xatolik: ' + e.message);
+  }
 }
 
-function viewCenter(id){
-  const c = state.centers.find(x=>x.id===id);
-  if(!c) return;
-  const pkg = state.packages[c.package];
-  const pays = state.payments.filter(p=>p.centerId===id);
-  const url = `${state.config.baseUrl||'https://your-app.up.railway.app'}/center/${id}`;
+function viewCenter(id) {
+  const c = allCenters.find(x => x.id === id);
+  if (!c) return;
+  const baseUrl = window.location.origin;
+  const url = `${baseUrl}/center/${id}`;
 
   document.getElementById('cdTitle').textContent = `#${id} — ${c.name}`;
   document.getElementById('cdBody').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-      <div class="mini-card"><div class="mini-card-title">Paket</div><div>${pkgChip(c.package)}</div></div>
-      <div class="mini-card"><div class="mini-card-title">Holat</div><div>${c.active?'<span class="chip active">Faol</span>':'<span class="chip inactive">Nofaol</span>'}</div></div>
-      <div class="mini-card"><div class="mini-card-title">Shahar</div><div class="mini-card-val" style="font-size:14px">${c.city||'—'}</div></div>
-      <div class="mini-card"><div class="mini-card-title">O'quvchilar</div><div class="mini-card-val">${c.studentsCount||0}</div></div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mini-card-title">Paket</div><div>${pkgChip(c.package_key||c.package_name)}</div></div>
+      <div class="mini-card"><div class="mini-card-title">Holat</div><div>${c.is_active?'<span class="chip active">Faol</span>':'<span class="chip inactive">Nofaol</span>'}</div></div>
+      <div class="mini-card"><div class="mini-card-title">Shahar</div><div style="font-size:14px">${c.city||'—'}</div></div>
+      <div class="mini-card"><div class="mini-card-title">O'quvchilar</div><div class="mini-card-val">${c.student_count||0}</div></div>
     </div>
     <div class="form-group">
       <label class="form-label">Admin</label>
-      <div style="font-size:13px;color:var(--text)">${c.adminName} — ${c.phone}</div>
+      <div style="font-size:13px;color:var(--text)">${c.admin_name} — ${c.phone}</div>
     </div>
     <div class="form-group">
       <label class="form-label">Markaz URL</label>
@@ -879,322 +871,211 @@ function viewCenter(id){
         <code style="background:var(--surface2);padding:8px 12px;border-radius:8px;font-size:12px;color:var(--accent2);flex:1">${url}</code>
         <button class="btn btn-ghost btn-sm" onclick="copyUrl(${id})"><i class="fa fa-copy"></i></button>
       </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Paket limitleri</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <span class="chip active">${pkg.groups===-1?'∞':pkg.groups} guruh</span>
-        <span class="chip active">${pkg.mentors===-1?'∞':pkg.mentors} mentor</span>
-        <span class="chip active">${pkg.students===-1?'∞':pkg.students} o'quvchi</span>
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">To'lovlar (${pays.length} ta)</label>
-      ${pays.length ? pays.map(p=>`
-        <div class="pay-item">
-          <div style="flex:1"><div class="pay-center">${p.month}</div></div>
-          <div class="pay-amount">${fmtNum(p.amount)} so'm</div>
-          <span class="chip ${p.status==='paid'?'active':p.status==='pending'?'pending':'inactive'}">${p.status==='paid'?'To\'landi':p.status==='pending'?'Kutilmoqda':'Bekor'}</span>
-        </div>`).join('') : '<div style="color:var(--text3);font-size:12px">To\'lov tarixi yo\'q</div>'}
-    </div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn ${c.active?'btn-danger':'btn-success'}" onclick="toggleCenter(${id});closeModal('modalCenterDetail')" style="flex:1">
-        ${c.active?'<i class="fa fa-ban"></i> Bloklash':'<i class="fa fa-check"></i> Faollashtirish'}
-      </button>
     </div>`;
+  document.getElementById('cdActions').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('modalCenterDetail')">Yopish</button>
+    <button class="btn ${c.is_active?'btn-danger':'btn-success'}" onclick="toggleCenter(${id});closeModal('modalCenterDetail')">
+      ${c.is_active?'<i class="fa fa-ban"></i> Bloklash':'<i class="fa fa-check"></i> Faollashtirish'}
+    </button>`;
   openModal('modalCenterDetail');
 }
 
-function copyUrl(id){
-  const base = state.config.baseUrl || 'https://your-app.up.railway.app';
-  const url = `${base}/center/${id}`;
-  navigator.clipboard.writeText(url).then(()=>{ alert('URL nusxalandi:\n'+url); }).catch(()=>{ prompt('URL:', url); });
-}
-
 // ==================== PAYMENTS ====================
-function renderPayments(month){
-  let pays = month ? state.payments.filter(p=>p.month===month) : state.payments;
-  const total = pays.filter(p=>p.status==='paid').reduce((a,b)=>a+b.amount,0);
-  const pending = pays.filter(p=>p.status==='pending').length;
-  document.getElementById('pm-total').textContent = fmtNum(total) + ' so\'m';
-  document.getElementById('pm-pending-count').textContent = pending + ' ta';
-  document.getElementById('pendingCount').textContent = state.payments.filter(p=>p.status==='pending').length;
+async function loadPayments(month) {
+  try {
+    const payments = await api('/payments' + (month ? '?month=' + month : ''));
+    const paid = payments.filter(p => p.status === 'paid');
+    const pending = payments.filter(p => p.status === 'pending');
+    const totalIncome = paid.reduce((a,b) => a + (b.amount||0), 0);
+    
+    document.getElementById('pm-total').textContent = fmtNum(totalIncome) + " so'm";
+    document.getElementById('pm-pending-count').textContent = pending.length + ' ta';
 
-  const tbody = document.getElementById('paymentsTable');
-  if(!pays.length){
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">To'lovlar yo'q</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = pays.map(p=>`
-    <tr>
-      <td><span class="center-name">${p.centerName}</span><br><span style="font-size:11px;color:var(--text3)">#${p.centerId}</span></td>
-      <td>${pkgChip(p.package)}</td>
-      <td style="font-weight:700;color:var(--accent2)">${fmtNum(p.amount)} so'm</td>
-      <td>${p.month}</td>
-      <td>${p.status==='paid'?'<span class="chip active">To\'landi</span>':p.status==='pending'?'<span class="chip pending">Kutilmoqda</span>':'<span class="chip inactive">Bekor</span>'}</td>
-      <td style="font-size:12px;color:var(--text3)">${p.paidAt?new Date(p.paidAt).toLocaleDateString('uz-UZ'):'—'}</td>
-      <td>
-        <div class="actions">
-          ${p.status==='pending'?`
-            <button class="btn btn-success btn-sm" onclick="checkPayment(${p.id})"><i class="fa fa-rotate"></i> Tekshir</button>
-            <button class="btn btn-ghost btn-sm" onclick="markPaid(${p.id})"><i class="fa fa-check"></i></button>
-          `:''}
-          ${p.status==='paid'?'<span style="color:var(--green);font-size:12px">✓ OK</span>':''}
-        </div>
-      </td>
-    </tr>`).join('');
-}
-function loadPayments(month){ renderPayments(month); }
-
-async function checkPayment(payId){
-  const pay = state.payments.find(p=>p.id===payId);
-  if(!pay) return;
-
-  if(!pay.orderId){
-    // Create payment via To'lovchi.uz
-    if(!state.config.shopId || !state.config.shopKey){
-      alert('To\'lovchi.uz API kalitlarini Sozlamalar bo\'limida kiriting!');
+    const tbody = document.getElementById('paymentsTable');
+    if (!payments.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">To'lovlar topilmadi</td></tr>`;
       return;
     }
-    try{
-      const url = `${state.config.apiUrl}?method=create&shop_id=${state.config.shopId}&shop_key=${state.config.shopKey}&amount=${pay.amount}`;
-      const r = await fetch(url);
-      const d = await r.json();
-      if(d.status==='success'){
-        pay.orderId = d.order;
-        saveState();
-        alert(`To'lov yaratildi!\nOrder ID: ${d.order}\nMarkaz adminiga to'lov havolasini yuboring.`);
-      } else {
-        alert('Xatolik: ' + (d.message||'Noma\'lum'));
-      }
-    } catch(e){ alert('API xatoligi: ' + e.message); }
-    return;
+    tbody.innerHTML = payments.map(p => `
+      <tr>
+        <td><div style="font-weight:600;color:var(--text)">${p.center_name}</div></td>
+        <td>${pkgChip(p.package_key || p.package_name)}</td>
+        <td style="font-weight:700;color:var(--accent2)">${fmtNum(p.amount)} so'm</td>
+        <td>${p.month}</td>
+        <td><span class="chip ${p.status==='paid'?'active':p.status==='pending'?'pending':'inactive'}">
+          ${p.status==='paid'?"To'landi":p.status==='pending'?'Kutilmoqda':'Bekor'}
+        </span></td>
+        <td style="font-size:12px;color:var(--text3)">${p.paid_at ? new Date(p.paid_at).toLocaleDateString('uz-UZ') : '—'}</td>
+        <td>${p.status === 'pending' ? `<button class="btn btn-success btn-sm" onclick="markPaid(${p.id})"><i class="fa fa-check"></i> To'landi</button>` : '—'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    console.error('Payments error:', e);
   }
-
-  // Check existing payment
-  try{
-    const url = `${state.config.apiUrl}?method=check&order=${pay.orderId}`;
-    const r = await fetch(url);
-    const d = await r.json();
-    if(d.status==='success'){
-      if(d.data.status==='paid'){
-        pay.status = 'paid';
-        pay.paidAt = new Date().toISOString();
-        // Activate center
-        const c = state.centers.find(x=>x.id===pay.centerId);
-        if(c) c.active = true;
-        saveState();
-        renderPayments();
-        renderDashboard();
-        alert('✅ To\'lov tasdiqlandi! Markaz faollashtirildi.');
-      } else if(d.data.status==='cancel'){
-        pay.status = 'cancelled';
-        saveState();
-        renderPayments();
-        alert('❌ To\'lov bekor qilingan.');
-      } else {
-        alert('⏳ To\'lov hali kutilmoqda (pending).');
-      }
-    }
-  } catch(e){ alert('API xatoligi: ' + e.message); }
 }
 
-function markPaid(payId){
-  if(!confirm('Bu to\'lovni qo\'lda to\'landi deb belgilaysizmi?')) return;
-  const pay = state.payments.find(p=>p.id===payId);
-  if(!pay) return;
-  pay.status = 'paid';
-  pay.paidAt = new Date().toISOString();
-  const c = state.centers.find(x=>x.id===pay.centerId);
-  if(c) c.active = true;
-  saveState();
-  renderPayments();
-  renderDashboard();
+async function markPaid(id) {
+  if (!confirm("Bu to'lovni to'landi deb belgilaymizmi?")) return;
+  try {
+    await api(`/payments/${id}/mark-paid`, { method: 'PUT' });
+    loadPayments('');
+    renderDashboard();
+  } catch(e) {
+    alert('Xatolik: ' + e.message);
+  }
 }
 
 // ==================== PACKAGES ====================
-function renderPackages(){
-  const pkgs = state.packages;
-  const html = Object.entries(pkgs).map(([key, pkg])=>`
-    <div class="pkg-card ${key==='pro'?'featured':key==='unlimited'?'top':''}">
-      ${key==='pro'?'<div class="pkg-badge popular">⭐ Mashhur</div>':''}
-      ${key==='unlimited'?'<div class="pkg-badge best">👑 Eng yaxshi</div>':''}
-      <div class="pkg-name">${pkg.name}</div>
-      <div class="pkg-price" style="color:${key==='free'?'var(--green)':key==='pro'?'var(--amber)':'var(--purple)'}">
-        ${pkg.price===0?'Bepul':fmtNum(pkg.price)+' so\'m'}
-        ${pkg.price>0?'<span class="pkg-period">/oy</span>':''}
-      </div>
-      <div class="pkg-features">
-        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> ${pkg.groups===-1?'Cheksiz guruhlar':pkg.groups+' ta guruh'}</div>
-        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> ${pkg.mentors===-1?'Cheksiz mentorlar':pkg.mentors+' ta mentor'}</div>
-        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> ${pkg.students===-1?'Cheksiz o\'quvchilar':pkg.students+' ta o\'quvchi'}</div>
-        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> AI yordamchi</div>
-        ${key==='pro'||key==='unlimited'?'<div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> Telegram bot</div>':'<div class="pkg-feature disabled"><i class="fa fa-times-circle"></i> Telegram bot</div>'}
-        ${key==='unlimited'?'<div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> Prioritet support</div>':''}
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">
-        Foydalanuvchilar: <strong style="color:var(--text)">${state.centers.filter(c=>c.package===key).length} ta</strong>
-      </div>
-      <div class="pkg-edit">
-        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="editPkg('${key}')">
-          <i class="fa fa-edit"></i> Tahrirlash
-        </button>
-      </div>
-    </div>`).join('');
-  document.getElementById('packagesGrid').innerHTML = html;
-
-  // Stats table
-  const tbody = document.getElementById('pkgStats');
-  const total = state.centers.length||1;
-  tbody.innerHTML = Object.entries(pkgs).map(([key,pkg])=>{
-    const count = state.centers.filter(c=>c.package===key).length;
-    const income = count * pkg.price;
-    return `<tr>
-      <td>${pkgChip(key)}</td>
-      <td style="font-weight:600;color:var(--text)">${count} ta</td>
-      <td style="font-weight:600;color:var(--accent2)">${fmtNum(income)} so'm</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="flex:1;height:4px;background:var(--surface2);border-radius:4px;overflow:hidden">
-            <div style="height:100%;width:${Math.round(count/total*100)}%;background:var(--accent);border-radius:4px"></div>
+async function loadPackages() {
+  try {
+    const packages = await api('/packages');
+    const centers = await api('/centers');
+    
+    const grid = document.getElementById('packagesGrid');
+    grid.innerHTML = packages.map(pkg => {
+      const count = centers.filter(c => (c.package_key||c.package_name) === pkg.key).length;
+      const income = count * (pkg.price || 0);
+      return `
+        <div class="pkg-card ${pkg.key==='pro'?'featured':pkg.key==='unlimited'?'top':''}">
+          ${pkg.key==='pro'?'<div class="pkg-badge popular">POPULAR</div>':''}
+          ${pkg.key==='unlimited'?'<div class="pkg-badge best">BEST</div>':''}
+          <div class="pkg-name">${pkg.name || pkg.key}</div>
+          <div class="pkg-price" style="color:${pkg.key==='free'?'var(--text3)':pkg.key==='pro'?'var(--amber)':'var(--purple)'}">
+            ${pkg.price ? fmtNum(pkg.price) : '0'}<span class="pkg-period"> so'm/oy</span>
           </div>
-          <span style="font-size:11px;color:var(--text3)">${Math.round(count/total*100)}%</span>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
+          <div class="pkg-features">
+            <div class="pkg-feature enabled"><i class="fa fa-check"></i> ${pkg.max_groups===-1?'Cheksiz':pkg.max_groups} guruh</div>
+            <div class="pkg-feature enabled"><i class="fa fa-check"></i> ${pkg.max_mentors===-1?'Cheksiz':pkg.max_mentors} mentor</div>
+            <div class="pkg-feature enabled"><i class="fa fa-check"></i> ${pkg.max_students===-1?'Cheksiz':pkg.max_students} o'quvchi</div>
+            <div class="pkg-feature enabled"><i class="fa fa-users"></i> ${count} ta markaz</div>
+          </div>
+          <div class="pkg-edit">
+            <button class="btn btn-ghost btn-sm" onclick="openEditPkg('${pkg.key}',${JSON.stringify(pkg).replace(/'/g,'\'')})" style="flex:1">
+              <i class="fa fa-pen"></i> Tahrirlash
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Stats table
+    const tbody = document.getElementById('pkgStats');
+    tbody.innerHTML = packages.map(pkg => {
+      const count = centers.filter(c => (c.package_key||c.package_name) === pkg.key).length;
+      const income = count * (pkg.price || 0);
+      const pct = centers.length ? Math.round(count/centers.length*100) : 0;
+      return `<tr>
+        <td>${pkgChip(pkg.key)}</td>
+        <td>${count} ta markaz</td>
+        <td style="font-weight:700;color:var(--accent2)">${fmtNum(income)} so'm/oy</td>
+        <td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:4px;background:var(--surface2);border-radius:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:4px"></div></div><span style="font-size:11px;color:var(--text3)">${pct}%</span></div></td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    console.error('Packages error:', e);
+  }
 }
 
-function editPkg(key){
-  const pkg = state.packages[key];
+function openEditPkg(key, pkg) {
+  document.getElementById('editPkgTitle').textContent = `${pkg.name || key} paketini tahrirlash`;
   document.getElementById('edit-pkg-key').value = key;
-  document.getElementById('editPkgTitle').textContent = pkg.name + ' paketini tahrirlash';
-  document.getElementById('edit-pkg-name').value = pkg.name;
-  document.getElementById('edit-pkg-price').value = pkg.price;
-  document.getElementById('edit-pkg-groups').value = pkg.groups;
-  document.getElementById('edit-pkg-mentors').value = pkg.mentors;
-  document.getElementById('edit-pkg-students').value = pkg.students;
+  document.getElementById('edit-pkg-name').value = pkg.name || key;
+  document.getElementById('edit-pkg-price').value = pkg.price || 0;
+  document.getElementById('edit-pkg-groups').value = pkg.max_groups;
+  document.getElementById('edit-pkg-mentors').value = pkg.max_mentors;
+  document.getElementById('edit-pkg-students').value = pkg.max_students;
   openModal('modalEditPkg');
 }
-function savePkg(){
+
+async function savePkg() {
   const key = document.getElementById('edit-pkg-key').value;
-  state.packages[key] = {
+  const body = {
     name: document.getElementById('edit-pkg-name').value,
-    price: parseInt(document.getElementById('edit-pkg-price').value)||0,
-    groups: parseInt(document.getElementById('edit-pkg-groups').value)||1,
-    mentors: parseInt(document.getElementById('edit-pkg-mentors').value)||1,
-    students: parseInt(document.getElementById('edit-pkg-students').value)||10,
+    price: parseInt(document.getElementById('edit-pkg-price').value) || 0,
+    max_groups: parseInt(document.getElementById('edit-pkg-groups').value),
+    max_mentors: parseInt(document.getElementById('edit-pkg-mentors').value),
+    max_students: parseInt(document.getElementById('edit-pkg-students').value),
   };
-  saveState();
-  closeModal('modalEditPkg');
-  renderPackages();
-  showAlert('alertPkg','success','Paket muvaffaqiyatli saqlandi!');
+  try {
+    await api(`/packages/${key}`, { method: 'PUT', body });
+    closeModal('modalEditPkg');
+    loadPackages();
+    showAlert('alertPkg', 'success', 'Paket saqlandi!');
+  } catch(e) {
+    alert('Xatolik: ' + e.message);
+  }
 }
 
 // ==================== SETTINGS ====================
-function loadSettings(){
-  document.getElementById('cfg-shop-id').value = state.config.shopId||'';
-  document.getElementById('cfg-shop-key').value = state.config.shopKey||'';
-  document.getElementById('cfg-api-url').value = state.config.apiUrl||'https://tolovavto.up.railway.app/api';
-  document.getElementById('cfg-base-url').value = state.config.baseUrl||'';
-  const base = state.config.baseUrl||'https://your-app.up.railway.app';
-  document.getElementById('urlTemplate').textContent = `${base}/center/{CENTER_ID}`;
+function loadSettings() {
+  const cfg = JSON.parse(localStorage.getItem('sa_config') || '{}');
+  document.getElementById('cfg-shop-id').value = cfg.shopId || '';
+  document.getElementById('cfg-api-url').value = cfg.apiUrl || 'https://tolovavto.up.railway.app/api';
+  document.getElementById('cfg-base-url').value = cfg.baseUrl || window.location.origin;
+  if (document.getElementById('urlTemplate')) {
+    document.getElementById('urlTemplate').textContent = `${cfg.baseUrl || window.location.origin}/center/{CENTER_ID}`;
+  }
 }
-function savePaymentConfig(){
-  state.config.shopId = document.getElementById('cfg-shop-id').value.trim();
-  state.config.shopKey = document.getElementById('cfg-shop-key').value.trim();
-  state.config.apiUrl = document.getElementById('cfg-api-url').value.trim();
-  saveState();
-  showAlert('alertSettings','success','API sozlamalari saqlandi!');
+
+function savePaymentConfig() {
+  const cfg = JSON.parse(localStorage.getItem('sa_config') || '{}');
+  cfg.shopId = document.getElementById('cfg-shop-id').value.trim();
+  cfg.shopKey = document.getElementById('cfg-shop-key').value;
+  cfg.apiUrl = document.getElementById('cfg-api-url').value.trim();
+  localStorage.setItem('sa_config', JSON.stringify(cfg));
+  showAlert('alertSettings', 'success', "API sozlamalari saqlandi!");
 }
-function saveBaseUrl(){
-  state.config.baseUrl = document.getElementById('cfg-base-url').value.trim();
-  saveState();
-  document.getElementById('urlTemplate').textContent = `${state.config.baseUrl}/center/{CENTER_ID}`;
-  alert('Saqlandi!');
+
+function saveBaseUrl() {
+  const cfg = JSON.parse(localStorage.getItem('sa_config') || '{}');
+  cfg.baseUrl = document.getElementById('cfg-base-url').value.trim();
+  localStorage.setItem('sa_config', JSON.stringify(cfg));
+  document.getElementById('urlTemplate').textContent = `${cfg.baseUrl}/center/{CENTER_ID}`;
+  showAlert('alertSettings', 'success', 'Saqlandi!');
 }
-function changePassword(){
-  const old = document.getElementById('old-pass').value;
-  const n1 = document.getElementById('new-pass').value;
-  const n2 = document.getElementById('new-pass2').value;
-  const stored = localStorage.getItem(BOSS_PASS_KEY)||DEFAULT_PASS;
-  if(old !== stored){ showAlert('alertSettings','error','Joriy parol noto\'g\'ri!'); return; }
-  if(n1 !== n2){ showAlert('alertSettings','error','Yangi parollar mos emas!'); return; }
-  if(n1.length < 6){ showAlert('alertSettings','error','Parol kamida 6 ta belgi bo\'lishi kerak!'); return; }
-  localStorage.setItem(BOSS_PASS_KEY, n1);
-  showAlert('alertSettings','success','Parol o\'zgartirildi!');
+
+function changePassword() {
+  showAlert('alertSettings', 'error', "Parolni o'zgartirish uchun server .env faylidagi SUPER_ADMIN_PASS ni o'zgartiring yoki bcrypt hash yarating.");
+}
+
+function clearAllData() {
+  alert("Bu funksiya backend ga ulanganida ishlaydi. Ma'lumotlarni o'chirish uchun to'g'ridan-to'g'ri database ga boring.");
 }
 
 // ==================== UTILS ====================
-function fmtNum(n){ return new Intl.NumberFormat('uz-UZ').format(n||0); }
-function daysLeft(iso){
+function fmtNum(n) { return new Intl.NumberFormat('uz-UZ').format(n||0); }
+function daysLeft(iso) {
   const d = Math.ceil((new Date(iso)-Date.now())/86400000);
   return d > 0 ? d : 0;
 }
-function pkgChip(pkg){
-  const map = { free:'<span class="chip trial">🆓 Free</span>', pro:'<span class="chip pro">⭐ Pro</span>', unlimited:'<span class="chip unlimited">👑 Unlimited</span>' };
-  return map[pkg]||pkg;
+function pkgChip(pkg) {
+  if (!pkg) return '—';
+  const map = {
+    free: '<span class="chip">Free</span>',
+    pro:  '<span class="chip pro">⭐ Pro</span>',
+    unlimited: '<span class="chip unlimited">👑 Unlimited</span>',
+  };
+  return map[pkg] || `<span class="chip">${pkg}</span>`;
 }
-function payStatusBadge(c){
-  if(!c.active) return '<span class="chip inactive">Nofaol</span>';
-  if(c.trialEnds && daysLeft(c.trialEnds)>0) return `<span class="chip trial">${daysLeft(c.trialEnds)} kun trial</span>`;
-  const pay = state.payments.find(p=>p.centerId===c.id&&p.status==='pending');
-  if(pay) return '<span class="chip pending">To\'lov kutilmoqda</span>';
-  return '<span class="chip active">To\'landi ✓</span>';
+function copyUrl(id) {
+  const cfg = JSON.parse(localStorage.getItem('sa_config') || '{}');
+  const base = cfg.baseUrl || window.location.origin;
+  navigator.clipboard.writeText(`${base}/center/${id}`).then(() => alert(`✅ URL nusxa olindi: ${base}/center/${id}`));
 }
-function openModal(id){ document.getElementById(id).classList.add('open'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-function showAlert(containerId, type, msg){
-  if(!msg){ document.getElementById(containerId).innerHTML=''; return; }
-  document.getElementById(containerId).innerHTML = `<div class="alert alert-${type}"><i class="fa fa-${type==='success'?'check':'exclamation'}-circle"></i> ${msg}</div>`;
-  setTimeout(()=>{ document.getElementById(containerId).innerHTML=''; }, 3000);
-}
-// Close modals on overlay click
-document.querySelectorAll('.modal-overlay').forEach(o=>{
-  o.addEventListener('click', e=>{ if(e.target===o) o.classList.remove('open'); });
-});
-
-// Demo data for first run
-function initDemoData(){
-  if(state.centers.length > 0) return;
-  state.centers = [
-    { id:1001, name:'Star Academy', city:'Toshkent', adminName:'Jasur Abdullayev', phone:'+998901234567', login:'admin', passHash:'', package:'pro', active:true, trialEnds:null, studentsCount:87, createdAt:'2026-03-01T00:00:00.000Z' },
-    { id:1002, name:'Najot Ta\'lim', city:'Samarqand', adminName:'Dilnoza Xasanova', phone:'+998931234567', login:'admin', passHash:'', package:'unlimited', active:true, trialEnds:null, studentsCount:234, createdAt:'2026-03-15T00:00:00.000Z' },
-    { id:1003, name:'IT Academy', city:'Namangan', adminName:'Bobur Toshev', phone:'+998941234567', login:'admin', passHash:'', package:'free', active:true, trialEnds:new Date(Date.now()+10*86400000).toISOString(), studentsCount:9, createdAt:'2026-04-01T00:00:00.000Z' },
-    { id:1004, name:'Komil Ta\'lim', city:'Buxoro', adminName:'Malika Rahimova', phone:'+998951234567', login:'admin', passHash:'', package:'pro', active:false, trialEnds:null, studentsCount:45, createdAt:'2026-04-10T00:00:00.000Z' },
-  ];
-  state.nextId = 1005;
-  state.payments = [
-    { id:1, centerId:1001, centerName:'Star Academy', package:'pro', amount:499000, month:'2026-05', status:'paid', createdAt:'2026-05-01T00:00:00.000Z', paidAt:'2026-05-02T00:00:00.000Z', orderId:'owld1001' },
-    { id:2, centerId:1002, centerName:'Najot Ta\'lim', package:'unlimited', amount:1000000, month:'2026-05', status:'paid', createdAt:'2026-05-01T00:00:00.000Z', paidAt:'2026-05-01T00:00:00.000Z', orderId:'owld1002' },
-    { id:3, centerId:1004, centerName:'Komil Ta\'lim', package:'pro', amount:499000, month:'2026-05', status:'pending', createdAt:'2026-05-01T00:00:00.000Z', paidAt:null, orderId:null },
-    { id:4, centerId:1001, centerName:'Star Academy', package:'pro', amount:499000, month:'2026-04', status:'paid', createdAt:'2026-04-01T00:00:00.000Z', paidAt:'2026-04-03T00:00:00.000Z', orderId:'owld0901' },
-  ];
-  saveState();
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function showAlert(id, type, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = msg ? `<div class="alert alert-${type}">${msg}</div>` : '';
+  if (msg) setTimeout(() => el.innerHTML = '', 4000);
 }
 
 // ==================== START ====================
-loadState();
-initDemoData();
 // Auto login check (session)
-if(sessionStorage.getItem('boss_session')==='1'){
-  document.getElementById('loginPage').style.display='none';
-  document.getElementById('panel').style.display='flex';
+if (superToken) {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('panel').style.display = 'flex';
   initPanel();
 }
-document.addEventListener('DOMContentLoaded', ()=>{
-  // Save session on login
-  const origLogin = doLogin;
-});
-// Save session flag
-const _origDoLogin = window.doLogin;
-window.doLogin = function(){
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value;
-  const storedPass = localStorage.getItem(BOSS_PASS_KEY)||DEFAULT_PASS;
-  if(u===BOSS_USER && p===storedPass){ sessionStorage.setItem('boss_session','1'); }
-  _origDoLogin();
-};
 </script>
 </body>
 </html>
