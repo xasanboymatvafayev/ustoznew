@@ -145,10 +145,10 @@ router.post('/centers', superAuth, async (req, res) => {
 
     const center = centerRes.rows[0];
 
-    // Admin akkauntini yaratish
+    // Admin akkauntini yaratish (username va login ikkalasini ham saqlaymiz)
     await db.query(`
-      INSERT INTO admins (login, password_hash, center_id, full_name, is_active)
-      VALUES ($1, $2, $3, $4, true)
+      INSERT INTO admins (username, login, password_hash, center_id, full_name, is_active)
+      VALUES ($1, $1, $2, $3, $4, true)
     `, [admin_login, passHash, center.id, admin_name]);
 
     // Agar pro/unlimited → to'lov yaratish
@@ -262,6 +262,108 @@ router.put('/payments/:id/mark-paid', superAuth, async (req, res) => {
     // Markaz faollashtirish
     await db.query(`UPDATE centers SET is_active=true WHERE id=$1`, [payRes.rows[0].center_id]);
     res.json({ success: true, message: 'To\'lov tasdiqlandi, markaz faollashtirildi' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROMOKODLAR — Superadmin yaratadi, admin to'lovda ishlatadi
+// ──────────────────────────────────────────────────────────────────────────
+
+// GET /api/superadmin/promocodes — Barcha promokodlar
+router.get('/promocodes', superAuth, async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const result = await db.query(`
+      SELECT p.*,
+        (SELECT COUNT(*) FROM promocode_uses WHERE promocode_id=p.id) as real_used_count
+      FROM promocodes p
+      ORDER BY p.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/superadmin/promocodes — Yangi promokod yaratish
+// Body: { code, discount_pct, package_key, duration_months, max_uses, expires_at }
+router.post('/promocodes', superAuth, async (req, res) => {
+  const db = req.app.get('db');
+  const {
+    code,
+    discount_pct = 100,
+    package_key = null,   // null = barcha paketlar
+    duration_months = 1,
+    max_uses = 1,
+    expires_at = null,
+  } = req.body;
+
+  if (!code) return res.status(400).json({ error: 'Promokod matni kiritilmadi' });
+  if (discount_pct < 1 || discount_pct > 100)
+    return res.status(400).json({ error: 'Chegirma 1-100% oralig\'ida bo\'lishi kerak' });
+
+  try {
+    // package_key mavjudligini tekshirish
+    if (package_key) {
+      const pkg = await db.query(`SELECT id FROM packages WHERE key=$1`, [package_key]);
+      if (!pkg.rows.length) return res.status(400).json({ error: 'Noto\'g\'ri paket kalit so\'zi' });
+    }
+
+    const result = await db.query(`
+      INSERT INTO promocodes
+        (code, discount_pct, package_key, duration_months, max_uses, expires_at, created_by, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+      RETURNING *
+    `, [
+      code.toUpperCase().trim(),
+      discount_pct,
+      package_key,
+      duration_months,
+      max_uses,
+      expires_at || null,
+      req.superAdmin.username,
+    ]);
+
+    res.json({ success: true, promocode: result.rows[0] });
+  } catch (e) {
+    if (e.code === '23505') return res.status(400).json({ error: 'Bu promokod allaqachon mavjud' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/superadmin/promocodes/:id/toggle — Faollashtirish/o'chirish
+router.put('/promocodes/:id/toggle', superAuth, async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const result = await db.query(
+      `UPDATE promocodes SET is_active = NOT is_active WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Topilmadi' });
+    res.json({ success: true, promocode: result.rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/superadmin/promocodes/:id
+router.delete('/promocodes/:id', superAuth, async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    await db.query(`DELETE FROM promocodes WHERE id=$1`, [req.params.id]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/superadmin/promocodes/:id/uses — Ishlatilish tarixi
+router.get('/promocodes/:id/uses', superAuth, async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const result = await db.query(`
+      SELECT pu.*, c.name as center_name, cp.month, cp.amount
+      FROM promocode_uses pu
+      JOIN centers c ON pu.center_id = c.id
+      LEFT JOIN center_payments cp ON pu.payment_id = cp.id
+      WHERE pu.promocode_id = $1
+      ORDER BY pu.used_at DESC
+    `, [req.params.id]);
+    res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
