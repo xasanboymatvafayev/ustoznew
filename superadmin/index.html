@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boss Admin Panel — Ustoz AI</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0f1a;--bg2:#111827;--bg3:#1a2236;
+  --surface:#1e2a3b;--surface2:#243044;--surface3:#2a3650;
+  --accent:#6366f1;--accent2:#818cf8;--accent3:#a5b4fc;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;
+  --text:#f1f5f9;--text2:#94a3b8;--text3:#64748b;
+  --border:#ffffff0f;--border2:#ffffff18;
+  --r:12px;--r-sm:8px;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* === SIDEBAR === */
+.sidebar{width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;height:100vh;z-index:100}
+.logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.logo h1{font-size:18px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo-sub{font-size:11px;color:var(--text3);margin-top:4px;padding-left:42px}
+.nav{flex:1;padding:12px 10px;overflow-y:auto}
+.nav-section{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.8px;padding:12px 10px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .15s;width:100%;border:none;background:none;text-align:left;position:relative}
+.nav-item:hover{background:var(--surface);color:var(--text)}
+.nav-item.active{background:linear-gradient(135deg,#6366f120,#a855f710);color:var(--accent2);border:1px solid #6366f130}
+.nav-item .icon{width:18px;text-align:center;font-size:14px}
+.nav-badge{margin-left:auto;background:#ef444420;color:#ef4444;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700}
+.nav-badge.green{background:#22c55e20;color:#22c55e}
+.sidebar-bottom{padding:10px;border-top:1px solid var(--border)}
+.boss-tag{background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;font-size:11px;font-weight:700;padding:8px 12px;border-radius:var(--r-sm);text-align:center;margin-bottom:8px}
+
+/* === MAIN === */
+.main{margin-left:240px;flex:1;min-height:100vh;background:var(--bg)}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 28px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:16px;font-weight:700;color:var(--text)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-date{font-size:12px;color:var(--text3)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#818cf8}
+.btn-success{background:#22c55e20;color:#22c55e;border:1px solid #22c55e30}
+.btn-success:hover{background:#22c55e30}
+.btn-danger{background:#ef444420;color:#ef4444;border:1px solid #ef444430}
+.btn-danger:hover{background:#ef444430}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);background:var(--surface2)}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+/* === CONTENT === */
+.content{padding:24px 28px}
+.page{display:none;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* === PAGE HEADER === */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.page-title{font-size:22px;font-weight:800;color:var(--text)}
+.page-sub{font-size:13px;color:var(--text3);margin-top:3px}
+
+/* === STATS GRID === */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 16px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:50%;opacity:.15;transform:translate(15px,-15px)}
+.stat-card.accent::before{background:var(--accent)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.amber::before{background:var(--amber)}
+.stat-card.purple::before{background:var(--purple)}
+.stat-icon{font-size:20px;margin-bottom:10px}
+.stat-val{font-size:26px;font-weight:800;color:var(--text)}
+.stat-label{font-size:11px;color:var(--text3);margin-top:2px;font-weight:500}
+.stat-delta{font-size:11px;margin-top:6px;font-weight:600}
+.stat-delta.up{color:var(--green)}
+.stat-delta.down{color:var(--red)}
+
+/* === TABLE === */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.table-header h3{font-size:14px;font-weight:700;color:var(--text)}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:6px 12px}
+.search-box input{background:none;border:none;outline:none;color:var(--text);font-size:12px;width:180px;font-family:inherit}
+.search-box input::placeholder{color:var(--text3)}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:10px 20px;text-align:left;background:var(--bg2)}
+td{padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.center-id{font-weight:700;color:var(--accent2);font-family:monospace}
+.center-name{font-weight:600;color:var(--text)}
+
+/* === CHIPS === */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.chip.active{background:#22c55e18;color:#22c55e}
+.chip.inactive{background:#ef444418;color:#ef4444}
+.chip.trial{background:#6366f118;color:#818cf8}
+.chip.pro{background:#f59e0b18;color:#f59e0b}
+.chip.unlimited{background:#a855f718;color:#c084fc}
+.chip.pending{background:#f59e0b18;color:#f59e0b}
+
+/* === MODAL === */
+.modal-overlay{display:none;position:fixed;inset:0;background:#00000080;z-index:1000;backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;width:520px;max-height:90vh;overflow-y:auto}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:700;color:var(--text)}
+.modal-close{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;border-radius:6px}
+.modal-close:hover{background:var(--surface);color:var(--text)}
+.modal-body{padding:24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+
+/* === FORM === */
+.form-group{margin-bottom:16px}
+.form-label{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;display:block}
+.form-input{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border .15s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:var(--text3)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-select{appearance:none;cursor:pointer}
+.form-hint{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* === PACKAGE CARDS === */
+.packages-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.pkg-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;position:relative}
+.pkg-card.featured{border-color:#f59e0b40;background:linear-gradient(135deg,#1e2a3b,#243044)}
+.pkg-card.top{border-color:#a855f740;background:linear-gradient(135deg,#1e2a3b,#2a1f3d)}
+.pkg-badge{position:absolute;top:-1px;right:16px;padding:4px 10px;border-radius:0 0 8px 8px;font-size:10px;font-weight:700}
+.pkg-badge.popular{background:#f59e0b;color:#000}
+.pkg-badge.best{background:#a855f7;color:#fff}
+.pkg-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.pkg-price{font-size:28px;font-weight:800;margin:10px 0 4px}
+.pkg-period{font-size:11px;color:var(--text3);font-weight:400}
+.pkg-features{margin:12px 0;display:flex;flex-direction:column;gap:6px}
+.pkg-feature{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px}
+.pkg-feature i{font-size:11px}
+.pkg-feature.enabled i{color:var(--green)}
+.pkg-feature.disabled{color:var(--text3)}
+.pkg-feature.disabled i{color:var(--text3)}
+.pkg-edit{display:flex;gap:6px;margin-top:14px}
+
+/* === CENTER ROW ACTIONS === */
+.actions{display:flex;gap:6px}
+
+/* === LOGIN PAGE === */
+.login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);flex-direction:column;gap:24px}
+.login-card{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:36px;width:380px}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo h1{font-size:22px;font-weight:800;color:var(--text)}
+.login-logo p{font-size:13px;color:var(--text3);margin-top:4px}
+.login-error{background:#ef444418;border:1px solid #ef444430;color:#ef4444;padding:10px 14px;border-radius:var(--r-sm);font-size:12px;margin-bottom:14px}
+
+/* === ALERTS === */
+.alert{padding:12px 16px;border-radius:var(--r-sm);font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.alert-success{background:#22c55e18;border:1px solid #22c55e30;color:#22c55e}
+.alert-error{background:#ef444418;border:1px solid #ef444430;color:#ef4444}
+
+/* === MINI CARDS === */
+.mini-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.mini-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.mini-card-title{font-size:11px;color:var(--text3);margin-bottom:6px}
+.mini-card-val{font-size:18px;font-weight:700;color:var(--text)}
+
+/* === TOLOV HISTORY === */
+.pay-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.pay-item:last-child{border-bottom:none}
+.pay-center{font-size:13px;font-weight:600;color:var(--text);flex:1}
+.pay-month{font-size:12px;color:var(--text3)}
+.pay-amount{font-size:13px;font-weight:700;color:var(--accent2)}
+
+/* === RESPONSIVE === */
+@media(max-width:900px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .packages-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginPage" class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div style="font-size:36px;margin-bottom:8px">🛡️</div>
+      <h1>Boss Admin Panel</h1>
+      <p>Ustoz AI — Super Administrator</p>
+    </div>
+    <div id="loginError" class="login-error" style="display:none"></div>
+    <div class="form-group">
+      <label class="form-label">Login</label>
+      <input class="form-input" id="loginUser" type="text" placeholder="boss_admin" value="boss_admin">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Parol</label>
+      <input class="form-input" id="loginPass" type="password" placeholder="••••••••">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="doLogin()">
+      <i class="fa fa-lock"></i> Kirish
+    </button>
+  </div>
+  <div style="font-size:11px;color:var(--text3)">Ustoz AI © 2026 — Boss Admin Panel v1.0</div>
+</div>
+
+<!-- ===== PANEL ===== -->
+<div id="panel" style="display:none;width:100%;display:flex">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">
+      <h1><div class="logo-icon">🛡️</div> Ustoz AI</h1>
+      <div class="logo-sub">Boss Admin Panel</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Asosiy</div>
+      <button class="nav-item active" onclick="showPage('dashboard',this)">
+        <i class="fa fa-chart-pie icon"></i> Dashboard
+      </button>
+      <button class="nav-item" onclick="showPage('centers',this)">
+        <i class="fa fa-building icon"></i> O'quv Markazlar
+        <span class="nav-badge green" id="centersCount">0</span>
+      </button>
+      <button class="nav-item" onclick="showPage('payments',this)">
+        <i class="fa fa-credit-card icon"></i> To'lovlar
+        <span class="nav-badge" id="pendingCount">0</span>
+      </button>
+
+      <div class="nav-section">Sozlamalar</div>
+      <button class="nav-item" onclick="showPage('packages',this)">
+        <i class="fa fa-box icon"></i> Paketlar
+      </button>
+      <button class="nav-item" onclick="showPage('settings',this)">
+        <i class="fa fa-gear icon"></i> Tizim sozlamas
+      </button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="boss-tag">👑 Super Administrator</div>
+      <button class="nav-item" onclick="doLogout()" style="color:#ef4444;width:100%">
+        <i class="fa fa-right-from-bracket icon"></i> Chiqish
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="topbarTitle">Dashboard</div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-date" id="topbarDate"></div>
+        <button class="btn btn-primary btn-sm" onclick="showPage('centers',document.querySelector('[onclick*=centers]'))">
+          <i class="fa fa-plus"></i> Markaz qo'shish
+        </button>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- ========== DASHBOARD ========== -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Dashboard 📊</div>
+            <div class="page-sub">Tizim umumiy holati</div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card accent">
+            <div class="stat-icon">🏢</div>
+            <div class="stat-val" id="ds-total">0</div>
+            <div class="stat-label">Jami o'quv markazlar</div>
+            <div class="stat-delta up" id="ds-active-c">0 faol</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">💰</div>
+            <div class="stat-val" id="ds-income">0</div>
+            <div class="stat-label">Bu oy tushumlari</div>
+            <div class="stat-delta up" id="ds-income-sub">so'm</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-val" id="ds-pending">0</div>
+            <div class="stat-label">Kutilayotgan to'lovlar</div>
+            <div class="stat-delta down">To'lanishi kerak</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon">🎓</div>
+            <div class="stat-val" id="ds-students">0</div>
+            <div class="stat-label">Jami o'quvchilar</div>
+            <div class="stat-delta up">barcha markazlarda</div>
+          </div>
+        </div>
+
+        <!-- Recent centers table -->
+        <div class="table-wrap">
+          <div class="table-header">
+            <h3>So'nggi qo'shilgan markazlar</h3>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('centers',document.querySelectorAll('.nav-item')[1])">
+              Barchasi →
+            </button>
+          </div>
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Markaz nomi</th><th>Paket</th><th>Holat</th><th>Amal qilish</th><th>URL</th>
+            </tr></thead>
+            <tbody id="recentCenters"><tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">Yuklanmoqda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========== CENTERS ========== -->
+      <div class="page" id="page-centers">
+        <div class="page-header">
+          <div>
+            <div class="page-title">O'quv Markazlar 🏢</div>
+            <div class="page-sub">Barcha registratsiya qilingan markazlar</div>
+          </div>
+          <button class="btn btn-primary" onclick="openAddCenter()">
+            <i class="fa fa-plus"></i> Yangi markaz qo'shish
+          </button>
+        </div>
+
+        <!-- Filters -->
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <div class="search-box">
+            <i class="fa fa-search" style="color:var(--text3);font-size:12px"></i>
+            <input type="text" placeholder="Markaz nomi yoki ID..." oninput="filterCenters(this.value)" id="centerSearch">
+          </div>
+          <select class="form-input form-select" style="width:auto;padding:6px 12px;font-size:12px" onchange="filterCentersByPkg(this.value)">
+            <option value="">Barcha paketlar</option>
+            <option value="free">Free</option>
+            <option value="pro">Pro</option>
+            <option value="unlimited">Unlimited</option>
+          </select>
+          <select class="form-input form-select" style="width:auto;padding:6px 12px;font-size:12px" onchange="filterCentersByStatus(this.value)">
+            <option value="">Barcha holat</option>
+            <option value="active">Faol</option>
+            <option value="inactive">Nofaol</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Markaz nomi</th><th>Admin</th><th>Paket</th><th>O'quvchilar</th><th>To'lov holati</th><th>URL</th><th>Amallar</th>
+            </tr></thead>
+            <tbody id="centersTable"><tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">Yuklanmoqda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========== PAYMENTS ========== -->
+      <div class="page" id="page-payments">
+        <div class="page-header">
+          <div>
+            <div class="page-title">To'lovlar 💳</div>
+            <div class="page-sub">O'quv markazlar oylik to'lovlari</div>
+          </div>
+        </div>
+        <div class="mini-cards">
+          <div class="mini-card">
+            <div class="mini-card-title">Bu oy jami tushum</div>
+            <div class="mini-card-val" id="pm-total">0 so'm</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Kutilayotgan to'lovlar</div>
+            <div class="mini-card-val" id="pm-pending-count" style="color:var(--amber)">0 ta</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <h3>To'lov tarixi</h3>
+            <select class="form-input form-select" style="width:auto;padding:5px 10px;font-size:12px" onchange="loadPayments(this.value)">
+              <option value="">Barcha oylar</option>
+              <option value="2026-05">May 2026</option>
+              <option value="2026-04">Aprel 2026</option>
+              <option value="2026-03">Mart 2026</option>
+            </select>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Markaz</th><th>Paket</th><th>Summa</th><th>Oy</th><th>Status</th><th>To'lov sanasi</th><th>Amallar</th>
+            </tr></thead>
+            <tbody id="paymentsTable"><tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">Yuklanmoqda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========== PACKAGES ========== -->
+      <div class="page" id="page-packages">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Paketlar 📦</div>
+            <div class="page-sub">Tariflarni sozlash va narxlarni o'zgartirish</div>
+          </div>
+        </div>
+        <div id="alertPkg"></div>
+        <div class="packages-grid" id="packagesGrid">
+          <!-- Dynamically rendered -->
+        </div>
+        <div class="table-wrap" style="padding:20px">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text)">📊 Paketlar statistikasi</h3>
+          <table>
+            <thead><tr><th>Paket</th><th>Foydalanuvchilar</th><th>Oylik daromad</th><th>Ulushi</th></tr></thead>
+            <tbody id="pkgStats"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========== SETTINGS ========== -->
+      <div class="page" id="page-settings">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Tizim sozlamalari ⚙️</div>
+            <div class="page-sub">API kalitlar va asosiy konfiguratsiya</div>
+          </div>
+        </div>
+        <div id="alertSettings"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="table-wrap" style="padding:20px">
+            <h3 style="font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text)">🔑 To'lovchi.uz API</h3>
+            <div class="form-group">
+              <label class="form-label">Shop ID</label>
+              <input class="form-input" id="cfg-shop-id" type="text" placeholder="shop_id">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shop Key (maxfiy)</label>
+              <input class="form-input" id="cfg-shop-key" type="password" placeholder="••••••••••">
+            </div>
+            <div class="form-group">
+              <label class="form-label">API Base URL</label>
+              <input class="form-input" id="cfg-api-url" type="text" value="https://tolovavto.up.railway.app/api">
+            </div>
+            <button class="btn btn-primary" onclick="savePaymentConfig()">
+              <i class="fa fa-save"></i> Saqlash
+            </button>
+          </div>
+          <div class="table-wrap" style="padding:20px">
+            <h3 style="font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text)">🔒 Boss Admin Parol</h3>
+            <div class="form-group">
+              <label class="form-label">Joriy parol</label>
+              <input class="form-input" id="old-pass" type="password" placeholder="Joriy parol">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Yangi parol</label>
+              <input class="form-input" id="new-pass" type="password" placeholder="Yangi parol">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Qaytaring</label>
+              <input class="form-input" id="new-pass2" type="password" placeholder="Qaytaring">
+            </div>
+            <button class="btn btn-primary" onclick="changePassword()">
+              <i class="fa fa-lock"></i> Parolni o'zgartirish
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap" style="padding:20px;margin-top:16px">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text)">ℹ️ Tizim URL shabloni</h3>
+          <p style="font-size:12px;color:var(--text3);margin-bottom:10px">O'quv markaz qo'shilganda quyidagi URL avtomatik generatsiya qilinadi:</p>
+          <code id="urlTemplate" style="background:var(--surface2);padding:10px 14px;border-radius:8px;display:block;font-size:13px;color:var(--accent2)">
+            https://your-railway-app.up.railway.app/center/{CENTER_ID}
+          </code>
+          <div class="form-group" style="margin-top:14px">
+            <label class="form-label">Railway App URL (saytingizning asosiy domeni)</label>
+            <input class="form-input" id="cfg-base-url" type="text" placeholder="https://your-app.up.railway.app">
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="saveBaseUrl()">Saqlash</button>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /panel -->
+
+<!-- ===== MODAL: ADD CENTER ===== -->
+<div class="modal-overlay" id="modalAddCenter">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🏢 Yangi O'quv Markaz qo'shish</div>
+      <button class="modal-close" onclick="closeModal('modalAddCenter')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="addCenterAlert"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Markaz nomi *</label>
+          <input class="form-input" id="ac-name" placeholder="Masalan: Star Academy">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Shahar</label>
+          <input class="form-input" id="ac-city" placeholder="Toshkent">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Admin ismi *</label>
+          <input class="form-input" id="ac-admin-name" placeholder="To'liq ism">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Admin telefon *</label>
+          <input class="form-input" id="ac-phone" placeholder="+998901234567">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Admin login *</label>
+          <input class="form-input" id="ac-login" placeholder="admin">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Admin parol *</label>
+          <input class="form-input" id="ac-pass" type="password" placeholder="Kuchli parol">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Paket tanlang *</label>
+        <select class="form-input form-select" id="ac-package">
+          <option value="free">🆓 Free — 1 guruh, 1 mentor, 10 o'quvchi (bepul)</option>
+          <option value="pro">⭐ Pro — 20 guruh, 400 o'quvchi (499,000 so'm/oy)</option>
+          <option value="unlimited">👑 Unlimited — Cheksiz (1,000,000 so'm/oy)</option>
+        </select>
+      </div>
+      <div class="form-group" id="trialDaysGroup">
+        <label class="form-label">Sinov davri (kun)</label>
+        <input class="form-input" id="ac-trial" type="number" value="30" min="0" max="90">
+        <div class="form-hint">Free paket uchun qancha kun bepul ishlaydi</div>
+      </div>
+      <div id="ac-url-preview" style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:4px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Generatsiya qilinadigan URL:</div>
+        <div id="ac-url-val" style="font-size:13px;color:var(--accent2);font-family:monospace">—</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">ID avtomatik beriladi (masalan: 1001)</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalAddCenter')">Bekor qilish</button>
+      <button class="btn btn-primary" onclick="addCenter()"><i class="fa fa-plus"></i> Markaz qo'shish</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EDIT PACKAGE -->
+<div class="modal-overlay" id="modalEditPkg">
+  <div class="modal" style="width:440px">
+    <div class="modal-header">
+      <div class="modal-title" id="editPkgTitle">Paketni tahrirlash</div>
+      <button class="modal-close" onclick="closeModal('modalEditPkg')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-pkg-key">
+      <div class="form-group">
+        <label class="form-label">Paket nomi</label>
+        <input class="form-input" id="edit-pkg-name">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Oylik narxi (so'm)</label>
+          <input class="form-input" id="edit-pkg-price" type="number">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Maksimal guruhlar</label>
+          <input class="form-input" id="edit-pkg-groups" type="number" placeholder="-1 = cheksiz">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Maks. mentorlar</label>
+          <input class="form-input" id="edit-pkg-mentors" type="number" placeholder="-1 = cheksiz">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Maks. o'quvchilar</label>
+          <input class="form-input" id="edit-pkg-students" type="number" placeholder="-1 = cheksiz">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalEditPkg')">Bekor</button>
+      <button class="btn btn-primary" onclick="savePkg()"><i class="fa fa-save"></i> Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CENTER DETAIL -->
+<div class="modal-overlay" id="modalCenterDetail">
+  <div class="modal" style="width:580px">
+    <div class="modal-header">
+      <div class="modal-title" id="cdTitle">Markaz tafsiloti</div>
+      <button class="modal-close" onclick="closeModal('modalCenterDetail')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="cdBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalCenterDetail')">Yopish</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== STATE ====================
+const BOSS_USER = 'boss_admin';
+const BOSS_PASS_KEY = 'boss_pass';
+const DEFAULT_PASS = 'ustoz2026';
+
+let state = {
+  loggedIn: false,
+  centers: [],
+  packages: {
+    free:      { name:'Free',      price:0,       groups:1,  mentors:1,  students:10 },
+    pro:       { name:'Pro',       price:499000,  groups:20, mentors:-1, students:400 },
+    unlimited: { name:'Unlimited', price:1000000, groups:-1, mentors:-1, students:-1 },
+  },
+  payments: [],
+  config: { shopId:'', shopKey:'', apiUrl:'https://tolovavto.up.railway.app/api', baseUrl:'' },
+  nextId: 1001,
+};
+
+// ==================== PERSIST ====================
+function saveState(){
+  localStorage.setItem('boss_state', JSON.stringify(state));
+}
+function loadState(){
+  const s = localStorage.getItem('boss_state');
+  if(s) state = { ...state, ...JSON.parse(s) };
+}
+
+// ==================== AUTH ====================
+function doLogin(){
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const storedPass = localStorage.getItem(BOSS_PASS_KEY) || DEFAULT_PASS;
+  if(u === BOSS_USER && p === storedPass){
+    state.loggedIn = true;
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('panel').style.display = 'flex';
+    initPanel();
+  } else {
+    const el = document.getElementById('loginError');
+    el.style.display = 'block';
+    el.textContent = 'Login yoki parol noto\'g\'ri!';
+  }
+}
+function doLogout(){
+  state.loggedIn = false;
+  document.getElementById('panel').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('loginPass').value = '';
+}
+document.getElementById('loginPass').addEventListener('keyup', e => { if(e.key==='Enter') doLogin(); });
+
+// ==================== INIT ====================
+function initPanel(){
+  loadState();
+  updateDate();
+  setInterval(updateDate, 60000);
+  renderDashboard();
+  renderPackages();
+  loadSettings();
+}
+function updateDate(){
+  const now = new Date();
+  document.getElementById('topbarDate').textContent = now.toLocaleDateString('uz-UZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+
+// ==================== NAV ====================
+const titles = { dashboard:'Dashboard 📊', centers:'O\'quv Markazlar 🏢', payments:'To\'lovlar 💳', packages:'Paketlar 📦', settings:'Sozlamalar ⚙️' };
+function showPage(page, el){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(el) el.classList.add('active');
+  document.getElementById('topbarTitle').textContent = titles[page] || page;
+  if(page==='dashboard') renderDashboard();
+  if(page==='centers') renderCenters();
+  if(page==='payments') renderPayments();
+  if(page==='packages') renderPackages();
+  if(page==='settings') loadSettings();
+}
+
+// ==================== DASHBOARD ====================
+function renderDashboard(){
+  const active = state.centers.filter(c=>c.active).length;
+  const pendingPay = state.payments.filter(p=>p.status==='pending').length;
+  const totalIncome = state.payments.filter(p=>p.status==='paid').reduce((a,b)=>a+(b.amount||0),0);
+  const totalStudents = state.centers.reduce((a,b)=>a+(b.studentsCount||0),0);
+
+  document.getElementById('ds-total').textContent = state.centers.length;
+  document.getElementById('ds-active-c').textContent = active + ' faol';
+  document.getElementById('ds-income').textContent = fmtNum(totalIncome);
+  document.getElementById('ds-pending').textContent = pendingPay;
+  document.getElementById('ds-students').textContent = totalStudents;
+  document.getElementById('centersCount').textContent = state.centers.length;
+  document.getElementById('pendingCount').textContent = pendingPay;
+
+  // recent 5
+  const tbody = document.getElementById('recentCenters');
+  const recent = [...state.centers].reverse().slice(0,5);
+  if(!recent.length){ tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">Hali markaz yo'q. Yangi markaz qo'shing!</td></tr>`; return; }
+  tbody.innerHTML = recent.map(c => `
+    <tr>
+      <td><span class="center-id">#${c.id}</span></td>
+      <td><span class="center-name">${c.name}</span></td>
+      <td>${pkgChip(c.package)}</td>
+      <td>${c.active ? '<span class="chip active">Faol</span>' : '<span class="chip inactive">Nofaol</span>'}</td>
+      <td>${c.trialEnds ? '<span class="chip trial">'+daysLeft(c.trialEnds)+' kun qoldi</span>' : '—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="copyUrl('${c.id}')"><i class="fa fa-copy"></i> URL</button></td>
+    </tr>`).join('');
+}
+
+// ==================== CENTERS ====================
+let filteredCenters = [];
+function renderCenters(list){
+  filteredCenters = list || state.centers;
+  const tbody = document.getElementById('centersTable');
+  if(!filteredCenters.length){
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">
+      Markaz topilmadi. <button class="btn btn-primary btn-sm" onclick="openAddCenter()">Qo'shish</button></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filteredCenters.map(c => `
+    <tr>
+      <td><span class="center-id">#${c.id}</span></td>
+      <td><div class="center-name">${c.name}</div><div style="font-size:11px;color:var(--text3)">${c.city||''}</div></td>
+      <td><div style="font-size:12px">${c.adminName}</div><div style="font-size:11px;color:var(--text3)">${c.phone}</div></td>
+      <td>${pkgChip(c.package)}</td>
+      <td><span style="font-weight:600;color:var(--accent2)">${c.studentsCount||0}</span></td>
+      <td>${payStatusBadge(c)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="copyUrl('${c.id}')"><i class="fa fa-copy"></i></button></td>
+      <td>
+        <div class="actions">
+          <button class="btn btn-ghost btn-sm" onclick="viewCenter(${c.id})" title="Ko'rish"><i class="fa fa-eye"></i></button>
+          <button class="btn ${c.active?'btn-danger':'btn-success'} btn-sm" onclick="toggleCenter(${c.id})">
+            ${c.active?'<i class="fa fa-ban"></i>':'<i class="fa fa-check"></i>'}
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="changePkg(${c.id})" title="Paket"><i class="fa fa-box"></i></button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filterCenters(q){
+  const f = state.centers.filter(c =>
+    c.name.toLowerCase().includes(q.toLowerCase()) ||
+    String(c.id).includes(q)
+  );
+  renderCenters(f);
+}
+function filterCentersByPkg(pkg){
+  const f = pkg ? state.centers.filter(c=>c.package===pkg) : state.centers;
+  renderCenters(f);
+}
+function filterCentersByStatus(st){
+  const f = st ? state.centers.filter(c=> st==='active' ? c.active : !c.active) : state.centers;
+  renderCenters(f);
+}
+
+function openAddCenter(){
+  document.getElementById('ac-name').value='';
+  document.getElementById('ac-city').value='';
+  document.getElementById('ac-admin-name').value='';
+  document.getElementById('ac-phone').value='';
+  document.getElementById('ac-login').value='admin';
+  document.getElementById('ac-pass').value='';
+  document.getElementById('ac-package').value='free';
+  document.getElementById('ac-trial').value='30';
+  updateUrlPreview();
+  openModal('modalAddCenter');
+}
+function updateUrlPreview(){
+  const base = state.config.baseUrl || 'https://your-app.up.railway.app';
+  document.getElementById('ac-url-val').textContent = `${base}/center/${state.nextId}`;
+}
+
+async function addCenter(){
+  const name = document.getElementById('ac-name').value.trim();
+  const city = document.getElementById('ac-city').value.trim();
+  const adminName = document.getElementById('ac-admin-name').value.trim();
+  const phone = document.getElementById('ac-phone').value.trim();
+  const login = document.getElementById('ac-login').value.trim();
+  const pass = document.getElementById('ac-pass').value;
+  const pkg = document.getElementById('ac-package').value;
+  const trial = parseInt(document.getElementById('ac-trial').value)||0;
+
+  if(!name||!adminName||!phone||!login||!pass){
+    showAlert('addCenterAlert','error','Barcha majburiy maydonlarni to\'ldiring!');
+    return;
+  }
+
+  const id = state.nextId++;
+  const trialEnds = trial > 0 ? new Date(Date.now() + trial*86400000).toISOString() : null;
+
+  const center = {
+    id, name, city, adminName, phone, login,
+    passHash: btoa(pass), // Simple encoding for demo; use bcrypt on server
+    package: pkg,
+    active: true,
+    trialEnds,
+    studentsCount: 0,
+    createdAt: new Date().toISOString(),
+    url: `${state.config.baseUrl||'https://your-app.up.railway.app'}/center/${id}`
+  };
+
+  state.centers.push(center);
+
+  // Auto-create pending payment if pro/unlimited
+  if(pkg !== 'free'){
+    const pkgData = state.packages[pkg];
+    state.payments.push({
+      id: Date.now(),
+      centerId: id,
+      centerName: name,
+      package: pkg,
+      amount: pkgData.price,
+      month: new Date().toISOString().slice(0,7),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      paidAt: null,
+      orderId: null,
+    });
+  }
+
+  saveState();
+  closeModal('modalAddCenter');
+  showAlert('addCenterAlert','success','');
+
+  // Show success with URL
+  const base = state.config.baseUrl || 'https://your-app.up.railway.app';
+  alert(`✅ Markaz qo'shildi!\n\nID: #${id}\nURL: ${base}/center/${id}\n\nAdmin login: ${login}\nAdmin parol: (kiritilgan parol)\n\nBu URLni markaz adminiga yuboring!`);
+
+  renderDashboard();
+  renderCenters();
+  document.getElementById('centersCount').textContent = state.centers.length;
+}
+
+function toggleCenter(id){
+  const c = state.centers.find(x=>x.id===id);
+  if(!c) return;
+  c.active = !c.active;
+  saveState();
+  renderCenters();
+  renderDashboard();
+}
+
+function changePkg(id){
+  const c = state.centers.find(x=>x.id===id);
+  if(!c) return;
+  const newPkg = prompt(`Yangi paket (#${id} - ${c.name}):\nfree, pro, unlimited`, c.package);
+  if(!newPkg || !['free','pro','unlimited'].includes(newPkg)) return;
+  c.package = newPkg;
+  saveState();
+  renderCenters();
+}
+
+function viewCenter(id){
+  const c = state.centers.find(x=>x.id===id);
+  if(!c) return;
+  const pkg = state.packages[c.package];
+  const pays = state.payments.filter(p=>p.centerId===id);
+  const url = `${state.config.baseUrl||'https://your-app.up.railway.app'}/center/${id}`;
+
+  document.getElementById('cdTitle').textContent = `#${id} — ${c.name}`;
+  document.getElementById('cdBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="mini-card"><div class="mini-card-title">Paket</div><div>${pkgChip(c.package)}</div></div>
+      <div class="mini-card"><div class="mini-card-title">Holat</div><div>${c.active?'<span class="chip active">Faol</span>':'<span class="chip inactive">Nofaol</span>'}</div></div>
+      <div class="mini-card"><div class="mini-card-title">Shahar</div><div class="mini-card-val" style="font-size:14px">${c.city||'—'}</div></div>
+      <div class="mini-card"><div class="mini-card-title">O'quvchilar</div><div class="mini-card-val">${c.studentsCount||0}</div></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Admin</label>
+      <div style="font-size:13px;color:var(--text)">${c.adminName} — ${c.phone}</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Markaz URL</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <code style="background:var(--surface2);padding:8px 12px;border-radius:8px;font-size:12px;color:var(--accent2);flex:1">${url}</code>
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl(${id})"><i class="fa fa-copy"></i></button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Paket limitleri</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="chip active">${pkg.groups===-1?'∞':pkg.groups} guruh</span>
+        <span class="chip active">${pkg.mentors===-1?'∞':pkg.mentors} mentor</span>
+        <span class="chip active">${pkg.students===-1?'∞':pkg.students} o'quvchi</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">To'lovlar (${pays.length} ta)</label>
+      ${pays.length ? pays.map(p=>`
+        <div class="pay-item">
+          <div style="flex:1"><div class="pay-center">${p.month}</div></div>
+          <div class="pay-amount">${fmtNum(p.amount)} so'm</div>
+          <span class="chip ${p.status==='paid'?'active':p.status==='pending'?'pending':'inactive'}">${p.status==='paid'?'To\'landi':p.status==='pending'?'Kutilmoqda':'Bekor'}</span>
+        </div>`).join('') : '<div style="color:var(--text3);font-size:12px">To\'lov tarixi yo\'q</div>'}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn ${c.active?'btn-danger':'btn-success'}" onclick="toggleCenter(${id});closeModal('modalCenterDetail')" style="flex:1">
+        ${c.active?'<i class="fa fa-ban"></i> Bloklash':'<i class="fa fa-check"></i> Faollashtirish'}
+      </button>
+    </div>`;
+  openModal('modalCenterDetail');
+}
+
+function copyUrl(id){
+  const base = state.config.baseUrl || 'https://your-app.up.railway.app';
+  const url = `${base}/center/${id}`;
+  navigator.clipboard.writeText(url).then(()=>{ alert('URL nusxalandi:\n'+url); }).catch(()=>{ prompt('URL:', url); });
+}
+
+// ==================== PAYMENTS ====================
+function renderPayments(month){
+  let pays = month ? state.payments.filter(p=>p.month===month) : state.payments;
+  const total = pays.filter(p=>p.status==='paid').reduce((a,b)=>a+b.amount,0);
+  const pending = pays.filter(p=>p.status==='pending').length;
+  document.getElementById('pm-total').textContent = fmtNum(total) + ' so\'m';
+  document.getElementById('pm-pending-count').textContent = pending + ' ta';
+  document.getElementById('pendingCount').textContent = state.payments.filter(p=>p.status==='pending').length;
+
+  const tbody = document.getElementById('paymentsTable');
+  if(!pays.length){
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">To'lovlar yo'q</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = pays.map(p=>`
+    <tr>
+      <td><span class="center-name">${p.centerName}</span><br><span style="font-size:11px;color:var(--text3)">#${p.centerId}</span></td>
+      <td>${pkgChip(p.package)}</td>
+      <td style="font-weight:700;color:var(--accent2)">${fmtNum(p.amount)} so'm</td>
+      <td>${p.month}</td>
+      <td>${p.status==='paid'?'<span class="chip active">To\'landi</span>':p.status==='pending'?'<span class="chip pending">Kutilmoqda</span>':'<span class="chip inactive">Bekor</span>'}</td>
+      <td style="font-size:12px;color:var(--text3)">${p.paidAt?new Date(p.paidAt).toLocaleDateString('uz-UZ'):'—'}</td>
+      <td>
+        <div class="actions">
+          ${p.status==='pending'?`
+            <button class="btn btn-success btn-sm" onclick="checkPayment(${p.id})"><i class="fa fa-rotate"></i> Tekshir</button>
+            <button class="btn btn-ghost btn-sm" onclick="markPaid(${p.id})"><i class="fa fa-check"></i></button>
+          `:''}
+          ${p.status==='paid'?'<span style="color:var(--green);font-size:12px">✓ OK</span>':''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+function loadPayments(month){ renderPayments(month); }
+
+async function checkPayment(payId){
+  const pay = state.payments.find(p=>p.id===payId);
+  if(!pay) return;
+
+  if(!pay.orderId){
+    // Create payment via To'lovchi.uz
+    if(!state.config.shopId || !state.config.shopKey){
+      alert('To\'lovchi.uz API kalitlarini Sozlamalar bo\'limida kiriting!');
+      return;
+    }
+    try{
+      const url = `${state.config.apiUrl}?method=create&shop_id=${state.config.shopId}&shop_key=${state.config.shopKey}&amount=${pay.amount}`;
+      const r = await fetch(url);
+      const d = await r.json();
+      if(d.status==='success'){
+        pay.orderId = d.order;
+        saveState();
+        alert(`To'lov yaratildi!\nOrder ID: ${d.order}\nMarkaz adminiga to'lov havolasini yuboring.`);
+      } else {
+        alert('Xatolik: ' + (d.message||'Noma\'lum'));
+      }
+    } catch(e){ alert('API xatoligi: ' + e.message); }
+    return;
+  }
+
+  // Check existing payment
+  try{
+    const url = `${state.config.apiUrl}?method=check&order=${pay.orderId}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    if(d.status==='success'){
+      if(d.data.status==='paid'){
+        pay.status = 'paid';
+        pay.paidAt = new Date().toISOString();
+        // Activate center
+        const c = state.centers.find(x=>x.id===pay.centerId);
+        if(c) c.active = true;
+        saveState();
+        renderPayments();
+        renderDashboard();
+        alert('✅ To\'lov tasdiqlandi! Markaz faollashtirildi.');
+      } else if(d.data.status==='cancel'){
+        pay.status = 'cancelled';
+        saveState();
+        renderPayments();
+        alert('❌ To\'lov bekor qilingan.');
+      } else {
+        alert('⏳ To\'lov hali kutilmoqda (pending).');
+      }
+    }
+  } catch(e){ alert('API xatoligi: ' + e.message); }
+}
+
+function markPaid(payId){
+  if(!confirm('Bu to\'lovni qo\'lda to\'landi deb belgilaysizmi?')) return;
+  const pay = state.payments.find(p=>p.id===payId);
+  if(!pay) return;
+  pay.status = 'paid';
+  pay.paidAt = new Date().toISOString();
+  const c = state.centers.find(x=>x.id===pay.centerId);
+  if(c) c.active = true;
+  saveState();
+  renderPayments();
+  renderDashboard();
+}
+
+// ==================== PACKAGES ====================
+function renderPackages(){
+  const pkgs = state.packages;
+  const html = Object.entries(pkgs).map(([key, pkg])=>`
+    <div class="pkg-card ${key==='pro'?'featured':key==='unlimited'?'top':''}">
+      ${key==='pro'?'<div class="pkg-badge popular">⭐ Mashhur</div>':''}
+      ${key==='unlimited'?'<div class="pkg-badge best">👑 Eng yaxshi</div>':''}
+      <div class="pkg-name">${pkg.name}</div>
+      <div class="pkg-price" style="color:${key==='free'?'var(--green)':key==='pro'?'var(--amber)':'var(--purple)'}">
+        ${pkg.price===0?'Bepul':fmtNum(pkg.price)+' so\'m'}
+        ${pkg.price>0?'<span class="pkg-period">/oy</span>':''}
+      </div>
+      <div class="pkg-features">
+        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> ${pkg.groups===-1?'Cheksiz guruhlar':pkg.groups+' ta guruh'}</div>
+        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> ${pkg.mentors===-1?'Cheksiz mentorlar':pkg.mentors+' ta mentor'}</div>
+        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> ${pkg.students===-1?'Cheksiz o\'quvchilar':pkg.students+' ta o\'quvchi'}</div>
+        <div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> AI yordamchi</div>
+        ${key==='pro'||key==='unlimited'?'<div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> Telegram bot</div>':'<div class="pkg-feature disabled"><i class="fa fa-times-circle"></i> Telegram bot</div>'}
+        ${key==='unlimited'?'<div class="pkg-feature enabled"><i class="fa fa-check-circle"></i> Prioritet support</div>':''}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+        Foydalanuvchilar: <strong style="color:var(--text)">${state.centers.filter(c=>c.package===key).length} ta</strong>
+      </div>
+      <div class="pkg-edit">
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="editPkg('${key}')">
+          <i class="fa fa-edit"></i> Tahrirlash
+        </button>
+      </div>
+    </div>`).join('');
+  document.getElementById('packagesGrid').innerHTML = html;
+
+  // Stats table
+  const tbody = document.getElementById('pkgStats');
+  const total = state.centers.length||1;
+  tbody.innerHTML = Object.entries(pkgs).map(([key,pkg])=>{
+    const count = state.centers.filter(c=>c.package===key).length;
+    const income = count * pkg.price;
+    return `<tr>
+      <td>${pkgChip(key)}</td>
+      <td style="font-weight:600;color:var(--text)">${count} ta</td>
+      <td style="font-weight:600;color:var(--accent2)">${fmtNum(income)} so'm</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:4px;background:var(--surface2);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${Math.round(count/total*100)}%;background:var(--accent);border-radius:4px"></div>
+          </div>
+          <span style="font-size:11px;color:var(--text3)">${Math.round(count/total*100)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function editPkg(key){
+  const pkg = state.packages[key];
+  document.getElementById('edit-pkg-key').value = key;
+  document.getElementById('editPkgTitle').textContent = pkg.name + ' paketini tahrirlash';
+  document.getElementById('edit-pkg-name').value = pkg.name;
+  document.getElementById('edit-pkg-price').value = pkg.price;
+  document.getElementById('edit-pkg-groups').value = pkg.groups;
+  document.getElementById('edit-pkg-mentors').value = pkg.mentors;
+  document.getElementById('edit-pkg-students').value = pkg.students;
+  openModal('modalEditPkg');
+}
+function savePkg(){
+  const key = document.getElementById('edit-pkg-key').value;
+  state.packages[key] = {
+    name: document.getElementById('edit-pkg-name').value,
+    price: parseInt(document.getElementById('edit-pkg-price').value)||0,
+    groups: parseInt(document.getElementById('edit-pkg-groups').value)||1,
+    mentors: parseInt(document.getElementById('edit-pkg-mentors').value)||1,
+    students: parseInt(document.getElementById('edit-pkg-students').value)||10,
+  };
+  saveState();
+  closeModal('modalEditPkg');
+  renderPackages();
+  showAlert('alertPkg','success','Paket muvaffaqiyatli saqlandi!');
+}
+
+// ==================== SETTINGS ====================
+function loadSettings(){
+  document.getElementById('cfg-shop-id').value = state.config.shopId||'';
+  document.getElementById('cfg-shop-key').value = state.config.shopKey||'';
+  document.getElementById('cfg-api-url').value = state.config.apiUrl||'https://tolovavto.up.railway.app/api';
+  document.getElementById('cfg-base-url').value = state.config.baseUrl||'';
+  const base = state.config.baseUrl||'https://your-app.up.railway.app';
+  document.getElementById('urlTemplate').textContent = `${base}/center/{CENTER_ID}`;
+}
+function savePaymentConfig(){
+  state.config.shopId = document.getElementById('cfg-shop-id').value.trim();
+  state.config.shopKey = document.getElementById('cfg-shop-key').value.trim();
+  state.config.apiUrl = document.getElementById('cfg-api-url').value.trim();
+  saveState();
+  showAlert('alertSettings','success','API sozlamalari saqlandi!');
+}
+function saveBaseUrl(){
+  state.config.baseUrl = document.getElementById('cfg-base-url').value.trim();
+  saveState();
+  document.getElementById('urlTemplate').textContent = `${state.config.baseUrl}/center/{CENTER_ID}`;
+  alert('Saqlandi!');
+}
+function changePassword(){
+  const old = document.getElementById('old-pass').value;
+  const n1 = document.getElementById('new-pass').value;
+  const n2 = document.getElementById('new-pass2').value;
+  const stored = localStorage.getItem(BOSS_PASS_KEY)||DEFAULT_PASS;
+  if(old !== stored){ showAlert('alertSettings','error','Joriy parol noto\'g\'ri!'); return; }
+  if(n1 !== n2){ showAlert('alertSettings','error','Yangi parollar mos emas!'); return; }
+  if(n1.length < 6){ showAlert('alertSettings','error','Parol kamida 6 ta belgi bo\'lishi kerak!'); return; }
+  localStorage.setItem(BOSS_PASS_KEY, n1);
+  showAlert('alertSettings','success','Parol o\'zgartirildi!');
+}
+
+// ==================== UTILS ====================
+function fmtNum(n){ return new Intl.NumberFormat('uz-UZ').format(n||0); }
+function daysLeft(iso){
+  const d = Math.ceil((new Date(iso)-Date.now())/86400000);
+  return d > 0 ? d : 0;
+}
+function pkgChip(pkg){
+  const map = { free:'<span class="chip trial">🆓 Free</span>', pro:'<span class="chip pro">⭐ Pro</span>', unlimited:'<span class="chip unlimited">👑 Unlimited</span>' };
+  return map[pkg]||pkg;
+}
+function payStatusBadge(c){
+  if(!c.active) return '<span class="chip inactive">Nofaol</span>';
+  if(c.trialEnds && daysLeft(c.trialEnds)>0) return `<span class="chip trial">${daysLeft(c.trialEnds)} kun trial</span>`;
+  const pay = state.payments.find(p=>p.centerId===c.id&&p.status==='pending');
+  if(pay) return '<span class="chip pending">To\'lov kutilmoqda</span>';
+  return '<span class="chip active">To\'landi ✓</span>';
+}
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function showAlert(containerId, type, msg){
+  if(!msg){ document.getElementById(containerId).innerHTML=''; return; }
+  document.getElementById(containerId).innerHTML = `<div class="alert alert-${type}"><i class="fa fa-${type==='success'?'check':'exclamation'}-circle"></i> ${msg}</div>`;
+  setTimeout(()=>{ document.getElementById(containerId).innerHTML=''; }, 3000);
+}
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click', e=>{ if(e.target===o) o.classList.remove('open'); });
+});
+
+// Demo data for first run
+function initDemoData(){
+  if(state.centers.length > 0) return;
+  state.centers = [
+    { id:1001, name:'Star Academy', city:'Toshkent', adminName:'Jasur Abdullayev', phone:'+998901234567', login:'admin', passHash:'', package:'pro', active:true, trialEnds:null, studentsCount:87, createdAt:'2026-03-01T00:00:00.000Z' },
+    { id:1002, name:'Najot Ta\'lim', city:'Samarqand', adminName:'Dilnoza Xasanova', phone:'+998931234567', login:'admin', passHash:'', package:'unlimited', active:true, trialEnds:null, studentsCount:234, createdAt:'2026-03-15T00:00:00.000Z' },
+    { id:1003, name:'IT Academy', city:'Namangan', adminName:'Bobur Toshev', phone:'+998941234567', login:'admin', passHash:'', package:'free', active:true, trialEnds:new Date(Date.now()+10*86400000).toISOString(), studentsCount:9, createdAt:'2026-04-01T00:00:00.000Z' },
+    { id:1004, name:'Komil Ta\'lim', city:'Buxoro', adminName:'Malika Rahimova', phone:'+998951234567', login:'admin', passHash:'', package:'pro', active:false, trialEnds:null, studentsCount:45, createdAt:'2026-04-10T00:00:00.000Z' },
+  ];
+  state.nextId = 1005;
+  state.payments = [
+    { id:1, centerId:1001, centerName:'Star Academy', package:'pro', amount:499000, month:'2026-05', status:'paid', createdAt:'2026-05-01T00:00:00.000Z', paidAt:'2026-05-02T00:00:00.000Z', orderId:'owld1001' },
+    { id:2, centerId:1002, centerName:'Najot Ta\'lim', package:'unlimited', amount:1000000, month:'2026-05', status:'paid', createdAt:'2026-05-01T00:00:00.000Z', paidAt:'2026-05-01T00:00:00.000Z', orderId:'owld1002' },
+    { id:3, centerId:1004, centerName:'Komil Ta\'lim', package:'pro', amount:499000, month:'2026-05', status:'pending', createdAt:'2026-05-01T00:00:00.000Z', paidAt:null, orderId:null },
+    { id:4, centerId:1001, centerName:'Star Academy', package:'pro', amount:499000, month:'2026-04', status:'paid', createdAt:'2026-04-01T00:00:00.000Z', paidAt:'2026-04-03T00:00:00.000Z', orderId:'owld0901' },
+  ];
+  saveState();
+}
+
+// ==================== START ====================
+loadState();
+initDemoData();
+// Auto login check (session)
+if(sessionStorage.getItem('boss_session')==='1'){
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('panel').style.display='flex';
+  initPanel();
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Save session on login
+  const origLogin = doLogin;
+});
+// Save session flag
+const _origDoLogin = window.doLogin;
+window.doLogin = function(){
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const storedPass = localStorage.getItem(BOSS_PASS_KEY)||DEFAULT_PASS;
+  if(u===BOSS_USER && p===storedPass){ sessionStorage.setItem('boss_session','1'); }
+  _origDoLogin();
+};
+</script>
+</body>
+</html>
