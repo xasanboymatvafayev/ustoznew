@@ -33,20 +33,19 @@ function currentMonth() {
 
 // ──────────────────────────────────────────────────────────────────────────
 // POST /api/payments/create
-// Body: { center_id }
+// Body: { center_id, promo_code? }
 // Admin token kerak
 // ──────────────────────────────────────────────────────────────────────────
 router.post('/create', async (req, res) => {
   const db = req.app.get('db');
-  const { center_id } = req.body;
+  const { center_id, promo_code } = req.body;
 
   if (!center_id) return res.status(400).json({ error: 'center_id kerak' });
-  if (!SHOP_ID || !SHOP_KEY) return res.status(500).json({ error: 'To\'lovchi.uz API kalitlari sozlanmagan (.env ga TOLOV_SHOP_ID va TOLOV_SHOP_KEY qo\'shing)' });
 
   try {
     // O'quv markaz va paketini olish
     const centerRes = await db.query(
-      `SELECT c.*, p.price, p.name as package_name
+      `SELECT c.*, p.price, p.name as package_name, p.key as package_key
        FROM centers c
        JOIN packages p ON c.package_id = p.id
        WHERE c.id = $1`,
@@ -70,12 +69,80 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // To'lovchi.uz da yangi to'lov yaratish
+    // ── Promokod tekshirish (ixtiyoriy) ───────────────────────────────────
+    let promoInfo   = null;
+    let finalAmount = center.price;
+
+    if (promo_code && promo_code.trim()) {
+      const promoRes = await db.query(
+        `SELECT * FROM promocodes
+         WHERE code = $1
+           AND is_active = true
+           AND (expires_at IS NULL OR expires_at > NOW())
+           AND (max_uses <= 0 OR used_count < max_uses)
+           AND (package_key IS NULL OR package_key = $2)`,
+        [promo_code.toUpperCase().trim(), center.package_key]
+      );
+
+      if (!promoRes.rows.length) {
+        return res.status(400).json({
+          error: 'Promokod yaroqsiz, muddati tugagan yoki bu paket uchun mos emas',
+        });
+      }
+
+      promoInfo   = promoRes.rows[0];
+      // Chegirma hisoblash
+      const discount = Math.floor(center.price * promoInfo.discount_pct / 100);
+      finalAmount = center.price - discount;
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Agar to'lov 0 so'm bo'lsa (100% promokod) — to'lovsiz faollashtirish
+    if (finalAmount <= 0) {
+      const payRes = await db.query(
+        `INSERT INTO center_payments
+           (center_id, month, amount, status, created_at, paid_at)
+         VALUES ($1, $2, $3, 'paid', NOW(), NOW())
+         RETURNING *`,
+        [center_id, month, 0]
+      );
+
+      // Promokod ishlatildi deb belgilash
+      if (promoInfo) {
+        await db.query(`UPDATE promocodes SET used_count = used_count + 1 WHERE id=$1`, [promoInfo.id]);
+        await db.query(
+          `INSERT INTO promocode_uses (promocode_id, center_id, payment_id) VALUES ($1, $2, $3)`,
+          [promoInfo.id, center_id, payRes.rows[0].id]
+        );
+      }
+
+      // Markaz faollashtirish
+      await db.query(
+        `UPDATE centers SET is_active=true, subscription_until=DATE_TRUNC('month', NOW()) + INTERVAL '1 month' - INTERVAL '1 day'
+         WHERE id=$1`,
+        [center_id]
+      );
+
+      return res.json({
+        success:  true,
+        status:   'paid',
+        amount:   0,
+        promo_applied: promoInfo ? { code: promoInfo.code, discount: 100 } : null,
+        payment:  payRes.rows[0],
+        message:  '✅ Promokod qo\'llanildi! Markaz faollashtirildi.',
+      });
+    }
+
+    // To'lovchi.uz orqali to'lov
+    if (!SHOP_ID || !SHOP_KEY) {
+      return res.status(500).json({ error: 'To\'lovchi.uz API kalitlari sozlanmagan (.env ga TOLOV_SHOP_ID va TOLOV_SHOP_KEY qo\'shing)' });
+    }
+
     const data = await tolovRequest({
       method:   'create',
       shop_id:  SHOP_ID,
       shop_key: SHOP_KEY,
-      amount:   center.price,
+      amount:   finalAmount,
     });
 
     if (data.status !== 'success') {
@@ -88,13 +155,28 @@ router.post('/create', async (req, res) => {
          (center_id, month, amount, order_id, status, created_at)
        VALUES ($1, $2, $3, $4, 'pending', NOW())
        RETURNING *`,
-      [center_id, month, center.price, data.order]
+      [center_id, month, finalAmount, data.order]
     );
+
+    // Promokod band qilish (ishlatildi lekin hali to'lanmagan)
+    if (promoInfo) {
+      await db.query(`UPDATE promocodes SET used_count = used_count + 1 WHERE id=$1`, [promoInfo.id]);
+      await db.query(
+        `INSERT INTO promocode_uses (promocode_id, center_id, payment_id) VALUES ($1, $2, $3)`,
+        [promoInfo.id, center_id, payRes.rows[0].id]
+      );
+    }
 
     res.json({
       success:  true,
       order_id: data.order,
-      amount:   center.price,
+      amount:   finalAmount,
+      original_amount: center.price,
+      promo_applied: promoInfo ? {
+        code:     promoInfo.code,
+        discount: promoInfo.discount_pct,
+        saved:    center.price - finalAmount,
+      } : null,
       payment:  payRes.rows[0],
       message:  `To'lov yaratildi. Order: ${data.order}`,
     });
@@ -237,6 +319,58 @@ router.get('/status', async (req, res) => {
       paid_at:    pay.paid_at,
       month:      pay.month,
       package:    pay.package_name,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// GET /api/payments/promo-check?code=XXX&center_id=YY
+// Admin to'lov formida promokod tekshirish
+// ──────────────────────────────────────────────────────────────────────────
+router.get('/promo-check', async (req, res) => {
+  const db = req.app.get('db');
+  const { code, center_id } = req.query;
+  if (!code || !center_id) return res.status(400).json({ error: 'code va center_id kerak' });
+
+  try {
+    // Markaz paketini olish
+    const centerRes = await db.query(
+      `SELECT c.*, p.price, p.key as package_key, p.name as package_name
+       FROM centers c JOIN packages p ON c.package_id=p.id WHERE c.id=$1`,
+      [center_id]
+    );
+    if (!centerRes.rows.length) return res.status(404).json({ error: 'Markaz topilmadi' });
+    const center = centerRes.rows[0];
+
+    const promoRes = await db.query(
+      `SELECT * FROM promocodes
+       WHERE code = $1
+         AND is_active = true
+         AND (expires_at IS NULL OR expires_at > NOW())
+         AND (max_uses <= 0 OR used_count < max_uses)
+         AND (package_key IS NULL OR package_key = $2)`,
+      [code.toUpperCase().trim(), center.package_key]
+    );
+
+    if (!promoRes.rows.length) {
+      return res.json({ valid: false, message: 'Promokod yaroqsiz yoki bu paket uchun mos emas' });
+    }
+
+    const promo = promoRes.rows[0];
+    const discount = Math.floor(center.price * promo.discount_pct / 100);
+    const finalAmount = center.price - discount;
+
+    res.json({
+      valid:          true,
+      code:           promo.code,
+      discount_pct:   promo.discount_pct,
+      original_price: center.price,
+      discount_amount: discount,
+      final_amount:   finalAmount,
+      package_name:   center.package_name,
+      message:        `✅ Promokod qo'llandi! ${promo.discount_pct}% chegirma — ${discount.toLocaleString()} so'm tejaladi`,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
