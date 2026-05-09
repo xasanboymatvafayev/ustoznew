@@ -25,9 +25,14 @@ const frontendPublic = path.join(__dirname, '..', 'frontend', 'public');
 const frontendRoot   = require('fs').existsSync(frontendBuild) ? frontendBuild : frontendPublic;
 console.log('Frontend served from:', frontendRoot);
 
+// / → /superadmin (bu static middleware dan OLDIN bo'lishi shart)
+app.get('/', (req, res) => res.redirect('/superadmin'));
+
 // CRA build qilganda asset yo'llari absolyut bo'ladi: /static/js/main.js
-// Shuning uchun root '/' dan ham static fayllarni serve qilamiz
-app.use(express.static(frontendRoot));
+// Faqat /static/, /manifest.json kabi fayllarni serve qilamiz (index.html emas)
+app.use('/static', express.static(require('path').join(frontendRoot, 'static')));
+app.use('/manifest.json', express.static(require('path').join(frontendRoot, 'manifest.json')));
+app.use('/favicon.ico', express.static(require('path').join(frontendRoot, 'favicon.ico')));
 
 // /center/:centerId/* uchun ham static fayllar (ehtiyot uchun)
 app.use('/center', express.static(frontendRoot));
@@ -248,8 +253,7 @@ app.get('/health', (req, res) => res.json({
   baseUrl: process.env.BASE_URL || 'not set'
 }));
 
-// ── Root redirect ─────────────────────────────────────────────────────────
-app.get('/', (req, res) => res.redirect('/superadmin'));
+// ── Root redirect yuqorida (static dan oldin) ────────────────────────────
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
