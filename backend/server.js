@@ -47,6 +47,15 @@ const initDB = async () => {
   try {
     await pool.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
+    // Admins jadvaliga multitenant ustunlarini qo'shish (migration)
+    await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS login VARCHAR(100)`);
+    await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS center_id INTEGER REFERENCES centers(id)`);
+    await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS full_name VARCHAR(200)`);
+    await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`);
+    // login bo'sh bo'lsa username bilan to'ldiramiz
+    await pool.query(`UPDATE admins SET login=username WHERE login IS NULL`);
+    await pool.query(`UPDATE admins SET is_active=true WHERE is_active IS NULL`);
+
     // Asosiy jadvallar (oldingi kod)
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
