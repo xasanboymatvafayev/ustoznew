@@ -817,7 +817,7 @@ function renderCenters(list) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">Markaz topilmadi. <button class="btn btn-primary btn-sm" onclick="openAddCenter()">Qo'shish</button></td></tr>`;
     return;
   }
-  tbody.innerHTML = list.map(c => `
+tbody.innerHTML = list.map(c => `
     <tr>
       <td><span class="center-id">#${c.id}</span></td>
       <td><div class="center-name">${c.name}</div><div style="font-size:11px;color:var(--text3)">${c.city||''}</div></td>
@@ -833,11 +833,11 @@ function renderCenters(list) {
             ${c.is_active?'<i class="fa fa-ban"></i>':'<i class="fa fa-check"></i>'}
           </button>
           <button class="btn btn-ghost btn-sm" onclick="changePkg(${c.id})" title="Paket"><i class="fa fa-box"></i></button>
+          <button class="btn btn-ghost btn-sm" style="color:#ef4444" onclick="deleteCenter(${c.id},'${c.name.replace(/'/g, "\\'")}')" title="O'chirish"><i class="fa fa-trash"></i></button>
         </div>
       </td>
     </tr>`).join('');
 }
-
 function filterCenters(q) {
   const f = allCenters.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) || String(c.id).includes(q));
   renderCenters(f);
@@ -1259,6 +1259,32 @@ function copyUrl(id) {
   const base = cfg.baseUrl || window.location.origin;
   navigator.clipboard.writeText(`${base}/center/${id}`).then(() => alert(`✅ URL nusxa olindi: ${base}/center/${id}`));
 }
+// ==================== DELETE & CLEAR ====================
+async function deleteCenter(id, name) {
+  if (!confirm(`"${name}" markazini o'chirishni tasdiqlaysizmi?\n\nBarcha ma'lumotlar (admin, o'quvchilar, to'lovlar) o'chadi!`)) return;
+  try {
+    await api('/centers/' + id, { method: 'DELETE' });
+    showAlert('alertCenters', 'success', `🗑️ "${name}" markazi o'chirildi`);
+    loadCenters();
+    renderDashboard();
+  } catch(e) {
+    alert('Xatolik: ' + e.message);
+  }
+}
+
+async function clearAllData() {
+  if (!confirm("⚠️ DIQQAT! Barcha markazlar, adminlar va to'lovlar o'chiriladi!\n\nDavom etasizmi?")) return;
+  if (!confirm("Ishonchingiz komilmi? Bu amalni qaytarib bo'lmaydi!")) return;
+  try {
+    await api('/clear', { method: 'POST' });
+    alert("✅ Barcha ma'lumotlar tozalandi!");
+    loadCenters();
+    renderDashboard();
+  } catch(e) {
+    alert('Xatolik: ' + e.message);
+  }
+}
+
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function showAlert(id, type, msg) {
