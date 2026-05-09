@@ -10,7 +10,7 @@ app.use(express.json());
 
 // ── Static: Boss Admin Panel ─────────────────────────────────────────────
 // superadmin/index.html → /superadmin/ da ochiladi
-app.use('/superadmin', express.static(path.join(__dirname, '..', 'superadmin')));
+app.use('/superadmin', express.static(path.join(__dirname, 'public', 'superadmin')));
 
 // ── Static: O'quv markaz frontendi ──────────────────────────────────────
 // /center/:id → frontend React app (index.html)
