@@ -20,12 +20,19 @@ console.log('superadmin exists:', fs.existsSync(saPath));
 app.use('/superadmin', express.static(path.join(__dirname, '..', 'superadmin')));
 
 // ── Static: O'quv markaz frontendi ──────────────────────────────────────
-// Build yo'q bo'lsa → frontend/public/index.html ishlatiladi
 const frontendBuild  = path.join(__dirname, '..', 'frontend', 'build');
 const frontendPublic = path.join(__dirname, '..', 'frontend', 'public');
 const frontendRoot   = require('fs').existsSync(frontendBuild) ? frontendBuild : frontendPublic;
 console.log('Frontend served from:', frontendRoot);
-app.use('/center/:centerId', require('express').static(frontendRoot));
+
+// CRA build qilganda asset yo'llari absolyut bo'ladi: /static/js/main.js
+// Shuning uchun root '/' dan ham static fayllarni serve qilamiz
+app.use(express.static(frontendRoot));
+
+// /center/:centerId/* uchun ham static fayllar (ehtiyot uchun)
+app.use('/center', express.static(frontendRoot));
+
+// SPA uchun: /center/:centerId va /center/:centerId/* → index.html
 app.get('/center/:centerId', (req, res) => { res.sendFile(path.join(frontendRoot, 'index.html')); });
 app.get('/center/:centerId/*', (req, res) => { res.sendFile(path.join(frontendRoot, 'index.html')); });
 
