@@ -8,9 +8,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// DEBUG: papka strukturasini ko'rish
+const fs = require('fs');
+console.log('__dirname:', __dirname);
+console.log('Root files:', fs.readdirSync(path.join(__dirname, '..')).join(', '));
+const saPath = path.join(__dirname, '..', 'superadmin');
+console.log('superadmin exists:', fs.existsSync(saPath));
+
 // ── Static: Boss Admin Panel ─────────────────────────────────────────────
 // superadmin/index.html → /superadmin/ da ochiladi
-app.use('/superadmin', express.static(path.join(__dirname, 'public', 'superadmin')));
+app.use('/superadmin', express.static(path.join(__dirname, '..', 'superadmin')));
 
 // ── Static: O'quv markaz frontendi ──────────────────────────────────────
 // /center/:id → frontend React app (index.html)
