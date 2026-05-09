@@ -7,35 +7,44 @@ import MentorPanel from './pages/MentorPanel';
 import StudentPanel from './pages/StudentPanel';
 import './styles/global.css';
 
-const ProtectedRoute = ({ children, role }) => {
+const ProtectedRoute = ({ children, role, centerId }) => {
   const { user, token } = useAuth();
+
   if (!token) {
-    // center_id saqlash
-    const centerId = window.location.pathname.split('/center/')[1]?.split('/')[0];
     const loginPath = centerId ? `/center/${centerId}/login` : '/login';
     return <Navigate to={loginPath} replace />;
   }
-  if (role && user?.role !== role) return <Navigate to="/login" replace />;
+
+  // Token mavjud lekin boshqa center ga tegishli bo'lsa — chiqarib yuboramiz
+  if (centerId && user?.center_id && String(user.center_id) !== String(centerId)) {
+    const loginPath = `/center/${centerId}/login`;
+    return <Navigate to={loginPath} replace />;
+  }
+
+  if (role && user?.role !== role) {
+    const loginPath = centerId ? `/center/${centerId}/login` : '/login';
+    return <Navigate to={loginPath} replace />;
+  }
+
   return children;
 };
 
 // /center/:centerId/* uchun wrapper
 function CenterApp() {
   const { centerId } = useParams();
-  // centerId ni global saqlaymiz
   if (centerId) localStorage.setItem('center_id', centerId);
 
   return (
     <Routes>
       <Route path="login" element={<LoginPage />} />
       <Route path="admin/*" element={
-        <ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>
+        <ProtectedRoute role="admin" centerId={centerId}><AdminPanel /></ProtectedRoute>
       } />
       <Route path="mentor/*" element={
-        <ProtectedRoute role="mentor"><MentorPanel /></ProtectedRoute>
+        <ProtectedRoute role="mentor" centerId={centerId}><MentorPanel /></ProtectedRoute>
       } />
       <Route path="student/*" element={
-        <ProtectedRoute role="student"><StudentPanel /></ProtectedRoute>
+        <ProtectedRoute role="student" centerId={centerId}><StudentPanel /></ProtectedRoute>
       } />
       <Route path="*" element={<Navigate to="login" replace />} />
     </Routes>
