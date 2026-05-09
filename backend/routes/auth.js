@@ -148,10 +148,37 @@ router.post('/login/mentor', async (req, res) => {
 // ADMIN LOGIN
 // ─────────────────────────────────────────────
 router.post('/login/admin', async (req, res) => {
-  const { password } = req.body;
-  if (password !== 'sonnet123') return res.status(401).json({ error: 'Parol noto\'g\'ri' });
-  const token = jwt.sign({ id: 'admin', role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
-  res.json({ token, role: 'admin' });
+  const { username, password, center_id } = req.body;
+  const db = req.app.get('db');
+  try {
+    // center_id bilan admins jadvalidan qidirish
+    let result;
+    if (center_id) {
+      result = await db.query(
+        'SELECT * FROM admins WHERE username=$1 AND center_id=$2 AND is_active=true',
+        [username, center_id]
+      );
+    } else {
+      result = await db.query(
+        'SELECT * FROM admins WHERE username=$1 AND is_active=true',
+        [username]
+      );
+    }
+    if (!result.rows.length) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
+
+    const admin = result.rows[0];
+    const valid = await bcrypt.compare(password, admin.password_hash);
+    if (!valid) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
+
+    const token = jwt.sign(
+      { id: admin.id, role: 'admin', center_id: admin.center_id },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    res.json({ token, role: 'admin', center_id: admin.center_id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ─────────────────────────────────────────────
