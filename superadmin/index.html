@@ -236,6 +236,10 @@ tr:hover td{background:var(--surface2)}
       <button class="nav-item" onclick="showPage('packages',this)">
         <i class="fa fa-box icon"></i> Paketlar
       </button>
+      <button class="nav-item" onclick="showPage('promocodes',this)">
+        <i class="fa fa-ticket icon"></i> Promokodlar
+        <span class="nav-badge" id="promoCount">0</span>
+      </button>
       <button class="nav-item" onclick="showPage('settings',this)">
         <i class="fa fa-gear icon"></i> Tizim sozlamas
       </button>
@@ -414,6 +418,31 @@ tr:hover td{background:var(--surface2)}
         </div>
       </div>
 
+      <!-- ========== PROMOCODES ========== -->
+      <div class="page" id="page-promocodes">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Promokodlar 🎟️</div>
+            <div class="page-sub">Chegirma kodlarini yaratish va boshqarish</div>
+          </div>
+          <button class="btn btn-primary" onclick="openAddPromo()">
+            <i class="fa fa-plus"></i> Yangi promokod
+          </button>
+        </div>
+        <div id="alertPromo"></div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div style="font-weight:600;font-size:14px">Barcha promokodlar</div>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Kod</th><th>Chegirma</th><th>Paket</th><th>Muddati</th><th>Ishlatildi</th><th>Holat</th><th>Amal</th>
+            </tr></thead>
+            <tbody id="promoTable"><tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">Yuklanmoqda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ========== SETTINGS ========== -->
       <div class="page" id="page-settings">
         <div class="page-header">
@@ -515,15 +544,13 @@ tr:hover td{background:var(--surface2)}
           <input class="form-input" id="ac-phone" placeholder="+998901234567">
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Admin login *</label>
-          <input class="form-input" id="ac-login" placeholder="admin">
+      <div class="form-group">
+        <label class="form-label">Admin parol * <span style="font-size:11px;color:var(--text3)">(admin qulf belgisini bosib shu parolni kiritadi)</span></label>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="ac-pass" type="password" placeholder="Kuchli parol" style="flex:1">
+          <button class="btn btn-ghost btn-sm" type="button" onclick="genAdminPass()" title="Avtomatik yaratish">🎲</button>
         </div>
-        <div class="form-group">
-          <label class="form-label">Admin parol *</label>
-          <input class="form-input" id="ac-pass" type="password" placeholder="Kuchli parol">
-        </div>
+        <input type="hidden" id="ac-login" value="admin">
       </div>
       <div class="form-group">
         <label class="form-label">Paket tanlang *</label>
@@ -588,6 +615,55 @@ tr:hover td{background:var(--surface2)}
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modalEditPkg')">Bekor</button>
       <button class="btn btn-primary" onclick="savePkg()"><i class="fa fa-save"></i> Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD PROMO -->
+<div class="modal-overlay" id="modalAddPromo">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Yangi promokod yaratish 🎟️</div>
+      <button class="modal-close" onclick="closeModal('modalAddPromo')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Promokod (lotin harflar, raqamlar)</label>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="promo-code" placeholder="Masalan: YANGI2025" style="flex:1;text-transform:uppercase">
+          <button class="btn btn-ghost btn-sm" onclick="genPromoCode()" title="Avtomatik yaratish"><i class="fa fa-dice"></i></button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Chegirma (%)</label>
+          <input class="form-input" id="promo-discount" type="number" value="100" min="1" max="100" placeholder="1-100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Davomiyligi (oy)</label>
+          <input class="form-input" id="promo-duration" type="number" value="1" min="1" placeholder="Oylar soni">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Paket (bo'sh = barcha)</label>
+          <select class="form-input" id="promo-package">
+            <option value="">Barcha paketlar</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Maks. foydalanish</label>
+          <input class="form-input" id="promo-maxuses" type="number" value="1" min="1" placeholder="Nechta">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amal qilish muddati (ixtiyoriy)</label>
+        <input class="form-input" id="promo-expires" type="date">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalAddPromo')">Bekor</button>
+      <button class="btn btn-primary" onclick="savePromo()"><i class="fa fa-ticket"></i> Yaratish</button>
     </div>
   </div>
 </div>
@@ -678,7 +754,7 @@ function updateDate() {
 }
 
 // ==================== NAV ====================
-const titles = { dashboard:'Dashboard 📊', centers:"O'quv Markazlar 🏢", payments:"To'lovlar 💳", packages:'Paketlar 📦', settings:'Sozlamalar ⚙️' };
+const titles = { dashboard:'Dashboard 📊', centers:"O'quv Markazlar 🏢", payments:"To'lovlar 💳", packages:'Paketlar 📦', promocodes:'Promokodlar 🎟️', settings:'Sozlamalar ⚙️' };
 function showPage(page, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -689,6 +765,7 @@ function showPage(page, el) {
   if (page === 'centers') loadCenters();
   if (page === 'payments') loadPayments('');
   if (page === 'packages') loadPackages();
+  if (page === 'promocodes') loadPromos();
   if (page === 'settings') loadSettings();
 }
 
@@ -797,7 +874,7 @@ async function addCenter() {
   const package_key = document.getElementById('ac-package').value;
   const trial_days = parseInt(document.getElementById('ac-trial').value) || 0;
 
-  if (!name || !admin_name || !phone || !admin_login || !admin_password) {
+  if (!name || !admin_name || !phone || !admin_password) {
     showAlert('addCenterAlert', 'error', "Barcha majburiy maydonlarni to'ldiring!");
     return;
   }
@@ -807,16 +884,17 @@ async function addCenter() {
       method: 'POST',
       body: { name, city, admin_name, phone, admin_login, admin_password, package_key, trial_days }
     });
+    const savedPass = admin_password;
     closeModal('modalAddCenter');
+    document.getElementById('ac-pass').value = '';
     alert(`✅ Markaz qo'shildi!
 
 ID: #${result.center.id}
 URL: ${result.url}
 
-Admin login: ${admin_login}
-Admin parol: (kiritilgan parol)
+Admin parol: ${savedPass}
 
-Bu URLni markaz adminiga yuboring!`);
+Bu URLni va parolni markaz adminiga yuboring!`);
     loadCenters();
     renderDashboard();
   } catch(e) {
@@ -928,6 +1006,8 @@ async function markPaid(id) {
 async function loadPackages() {
   try {
     const packages = await api('/packages');
+    pkgMap = {};
+    packages.forEach(p => pkgMap[p.key] = p);
     const centers = await api('/centers');
     
     const grid = document.getElementById('packagesGrid');
@@ -949,7 +1029,7 @@ async function loadPackages() {
             <div class="pkg-feature enabled"><i class="fa fa-users"></i> ${count} ta markaz</div>
           </div>
           <div class="pkg-edit">
-            <button class="btn btn-ghost btn-sm" onclick="openEditPkg('${pkg.key}',${JSON.stringify(pkg).replace(/'/g,'\'')})" style="flex:1">
+            <button class="btn btn-ghost btn-sm" onclick="openEditPkgById('${pkg.key}')" style="flex:1">
               <i class="fa fa-pen"></i> Tahrirlash
             </button>
           </div>
@@ -972,6 +1052,15 @@ async function loadPackages() {
   } catch(e) {
     console.error('Packages error:', e);
   }
+}
+
+// pkgMap - barcha paketlarni key bo'yicha saqlash
+let pkgMap = {};
+
+function openEditPkgById(key) {
+  const pkg = pkgMap[key];
+  if (!pkg) return alert('Paket topilmadi');
+  openEditPkg(key, pkg);
 }
 
 function openEditPkg(key, pkg) {
@@ -1002,6 +1091,116 @@ async function savePkg() {
   } catch(e) {
     alert('Xatolik: ' + e.message);
   }
+}
+
+// ==================== PROMOCODES ====================
+async function loadPromos() {
+  try {
+    const promos = await api('/promocodes');
+    document.getElementById('promoCount').textContent = promos.filter(p => p.is_active).length;
+    const tbody = document.getElementById('promoTable');
+    if (!promos.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">Hali promokod yo\'q. Yangi yarating!</td></tr>';
+      return;
+    }
+    tbody.innerHTML = promos.map(p => {
+      const expires = p.expires_at ? new Date(p.expires_at).toLocaleDateString('uz-UZ') : '—';
+      const pkg = p.package_key || 'Barchasi';
+      const used = parseInt(p.real_used_count || 0);
+      const max = p.max_uses;
+      return `<tr>
+        <td><code style="background:var(--surface2);padding:4px 8px;border-radius:6px;font-weight:700;color:var(--accent2)">${p.code}</code></td>
+        <td><span style="color:var(--green);font-weight:700">${p.discount_pct}%</span> / ${p.duration_months} oy</td>
+        <td>${pkg}</td>
+        <td style="font-size:12px;color:var(--text2)">${expires}</td>
+        <td>${used} / ${max}</td>
+        <td>${p.is_active ? '<span class="chip active">Faol</span>' : '<span class="chip inactive">Nofaol</span>'}</td>
+        <td style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="togglePromo(${p.id})" title="${p.is_active ? 'O\'chirish' : 'Yoqish'}">
+            <i class="fa fa-${p.is_active ? 'ban' : 'check'}"></i>
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="copyPromoCode('${p.code}')" title="Nusxa olish">
+            <i class="fa fa-copy"></i>
+          </button>
+          <button class="btn btn-ghost btn-sm" style="color:#ef4444" onclick="deletePromo(${p.id},'${p.code}')" title="O\'chirish">
+            <i class="fa fa-trash"></i>
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    console.error('Promos error:', e);
+  }
+}
+
+function openAddPromo() {
+  // Paketlarni select ga to'ldiramiz
+  const sel = document.getElementById('promo-package');
+  sel.innerHTML = '<option value="">Barcha paketlar</option>' +
+    Object.values(pkgMap).map(p => `<option value="${p.key}">${p.name || p.key}</option>`).join('');
+  document.getElementById('promo-code').value = '';
+  document.getElementById('promo-discount').value = 100;
+  document.getElementById('promo-duration').value = 1;
+  document.getElementById('promo-maxuses').value = 1;
+  document.getElementById('promo-expires').value = '';
+  openModal('modalAddPromo');
+}
+
+function genAdminPass() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const pass = Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  document.getElementById('ac-pass').value = pass;
+  // Parolni ko'rsatish uchun type ni text ga o'zgartiramiz
+  const inp = document.getElementById('ac-pass');
+  inp.type = 'text';
+  setTimeout(() => inp.type = 'password', 2000);
+}
+
+function genPromoCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const code = Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  document.getElementById('promo-code').value = code;
+}
+
+async function savePromo() {
+  const code = document.getElementById('promo-code').value.trim().toUpperCase();
+  if (!code) return alert('Promokod kiriting!');
+  const body = {
+    code,
+    discount_pct: parseInt(document.getElementById('promo-discount').value) || 100,
+    package_key: document.getElementById('promo-package').value || null,
+    duration_months: parseInt(document.getElementById('promo-duration').value) || 1,
+    max_uses: parseInt(document.getElementById('promo-maxuses').value) || 1,
+    expires_at: document.getElementById('promo-expires').value || null,
+  };
+  try {
+    await api('/promocodes', { method: 'POST', body });
+    closeModal('modalAddPromo');
+    loadPromos();
+    showAlert('alertPromo', 'success', `✅ Promokod "${code}" yaratildi!`);
+  } catch(e) {
+    alert('Xatolik: ' + e.message);
+  }
+}
+
+async function togglePromo(id) {
+  try {
+    await api('/promocodes/' + id + '/toggle', { method: 'PUT' });
+    loadPromos();
+  } catch(e) { alert('Xatolik: ' + e.message); }
+}
+
+async function deletePromo(id, code) {
+  if (!confirm(`"${code}" promokodini o'chirishni tasdiqlaysizmi?`)) return;
+  try {
+    await api('/promocodes/' + id, { method: 'DELETE' });
+    loadPromos();
+    showAlert('alertPromo', 'success', `🗑️ "${code}" o'chirildi`);
+  } catch(e) { alert('Xatolik: ' + e.message); }
+}
+
+function copyPromoCode(code) {
+  navigator.clipboard.writeText(code).then(() => showAlert('alertPromo', 'success', `📋 "${code}" nusxa olindi!`));
 }
 
 // ==================== SETTINGS ====================
