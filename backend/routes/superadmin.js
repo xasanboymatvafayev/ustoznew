@@ -145,13 +145,14 @@ router.post('/centers', superAuth, async (req, res) => {
 
     const center = centerRes.rows[0];
 
-    // Admin akkauntini yaratish (ON CONFLICT bilan)
+    // Admin akkauntini yaratish (100% UNIKAL username - hech qachon conflict bo'lmaydi)
+    const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const uniqueUsername = `admin_${center.id}_${uniqueSuffix}`;
+    
     await db.query(`
       INSERT INTO admins (username, login, password_hash, center_id, full_name, is_active)
-      VALUES ($1, $1, $2, $3, $4, true)
-      ON CONFLICT (username) DO UPDATE
-        SET password_hash=$2, center_id=$3, full_name=$4, is_active=true
-    `, [admin_login, passHash, center.id, admin_name]);
+      VALUES ($1, $2, $3, $4, $5, true)
+    `, [uniqueUsername, admin_login, passHash, center.id, admin_name]);
 
     // Agar pro/unlimited → to'lov yaratish
     if (package_key !== 'free' && pkg.price > 0) {
@@ -167,6 +168,8 @@ router.post('/centers', superAuth, async (req, res) => {
       center,
       url:     `${baseUrl}/center/${center.id}`,
       message: `Markaz #${center.id} yaratildi`,
+      admin_username: uniqueUsername,
+      admin_password: admin_password
     });
   } catch (e) {
     console.error('Create center error:', e);
@@ -317,13 +320,12 @@ router.get('/promocodes', superAuth, async (req, res) => {
 });
 
 // POST /api/superadmin/promocodes — Yangi promokod yaratish
-// Body: { code, discount_pct, package_key, duration_months, max_uses, expires_at }
 router.post('/promocodes', superAuth, async (req, res) => {
   const db = req.app.get('db');
   const {
     code,
     discount_pct = 100,
-    package_key = null,   // null = barcha paketlar
+    package_key = null,
     duration_months = 1,
     max_uses = 1,
     expires_at = null,
@@ -334,7 +336,6 @@ router.post('/promocodes', superAuth, async (req, res) => {
     return res.status(400).json({ error: 'Chegirma 1-100% oralig\'ida bo\'lishi kerak' });
 
   try {
-    // package_key mavjudligini tekshirish
     if (package_key) {
       const pkg = await db.query(`SELECT id FROM packages WHERE key=$1`, [package_key]);
       if (!pkg.rows.length) return res.status(400).json({ error: 'Noto\'g\'ri paket kalit so\'zi' });
