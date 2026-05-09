@@ -81,9 +81,13 @@ export default function LoginPage() {
   const handleAdminLogin = async () => {
     setLoading(true); clearMessages();
     try {
-      const res = await API.post('/auth/login/admin', { password: adminPass });
-      login(res.data.token, { role: 'admin' });
-      navigate('/admin');
+      // center_id ni URL dan yoki localStorage dan olamiz
+      const pathCenterId = window.location.pathname.split('/center/')[1]?.split('/')[0];
+      const center_id = pathCenterId || localStorage.getItem('center_id');
+      const res = await API.post('/auth/login/admin', { password: adminPass, center_id });
+      login(res.data.token, { role: 'admin', center_id: res.data.center_id });
+      const redirectPath = center_id ? `/center/${center_id}/admin` : '/admin';
+      navigate(redirectPath);
     } catch (e) { err(e.response?.data?.error || 'Parol noto\'g\'ri'); }
   };
 
