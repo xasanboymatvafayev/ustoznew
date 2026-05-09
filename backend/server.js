@@ -20,13 +20,14 @@ console.log('superadmin exists:', fs.existsSync(saPath));
 app.use('/superadmin', express.static(path.join(__dirname, '..', 'superadmin')));
 
 // ── Static: O'quv markaz frontendi ──────────────────────────────────────
-// /center/:id → frontend React app (index.html)
-// React app o'zi URL dan center ID ni oladi
-const frontendBuild = path.join(__dirname, '..', 'frontend', 'build');
-app.use('/center/:centerId', express.static(frontendBuild));
-app.get('/center/:centerId/*', (req, res) => {
-  res.sendFile(path.join(frontendBuild, 'index.html'));
-});
+// Build yo'q bo'lsa → frontend/public/index.html ishlatiladi
+const frontendBuild  = path.join(__dirname, '..', 'frontend', 'build');
+const frontendPublic = path.join(__dirname, '..', 'frontend', 'public');
+const frontendRoot   = require('fs').existsSync(frontendBuild) ? frontendBuild : frontendPublic;
+console.log('Frontend served from:', frontendRoot);
+app.use('/center/:centerId', require('express').static(frontendRoot));
+app.get('/center/:centerId', (req, res) => { res.sendFile(path.join(frontendRoot, 'index.html')); });
+app.get('/center/:centerId/*', (req, res) => { res.sendFile(path.join(frontendRoot, 'index.html')); });
 
 // ── DB Connection ─────────────────────────────────────────────────────────
 const pool = new Pool({
