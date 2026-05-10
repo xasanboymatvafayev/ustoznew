@@ -145,18 +145,15 @@ router.post('/centers', superAuth, async (req, res) => {
 
     const center = centerRes.rows[0];
 
-    // Admin akkauntini yaratish
-    // username = admin_{center_id} → har doim unikal
-    const uniqueUsername = `admin_${center.id}`;
+    // Center admini - center_admins jadvaliga saqlaymiz (admins ga emas)
     await db.query(`
-      INSERT INTO admins (username, login, password_hash, center_id, full_name, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
-      ON CONFLICT (username) DO UPDATE
-        SET password_hash=EXCLUDED.password_hash,
-            center_id=EXCLUDED.center_id,
-            full_name=EXCLUDED.full_name,
-            is_active=true
-    `, [uniqueUsername, admin_login || uniqueUsername, passHash, center.id, admin_name]);
+      INSERT INTO center_admins (center_id, full_name, password_hash, is_active)
+      VALUES ($1, $2, $3, true)
+      ON CONFLICT (center_id) DO UPDATE
+        SET password_hash = EXCLUDED.password_hash,
+            full_name     = EXCLUDED.full_name,
+            is_active     = true
+    `, [center.id, admin_name, passHash]);
 
     // Agar pro/unlimited → to'lov yaratish
     if (package_key !== 'free' && pkg.price > 0) {
