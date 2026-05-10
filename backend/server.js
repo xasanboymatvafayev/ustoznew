@@ -236,6 +236,17 @@ const initDB = async () => {
       UNIQUE(center_id, month)
     )`);
 
+    // Center adminlari - har bir markaz uchun alohida
+    await pool.query(`CREATE TABLE IF NOT EXISTS center_admins (
+      id            SERIAL PRIMARY KEY,
+      center_id     INTEGER NOT NULL REFERENCES centers(id) ON DELETE CASCADE,
+      full_name     VARCHAR(200),
+      password_hash VARCHAR(255) NOT NULL,
+      is_active     BOOLEAN DEFAULT TRUE,
+      created_at    TIMESTAMP DEFAULT NOW(),
+      UNIQUE(center_id)
+    )`);
+
     // Default admin (bitta global)
     await pool.query(`
       INSERT INTO admins (username, password_hash)
