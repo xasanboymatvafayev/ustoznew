@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import emailjs from '@emailjs/browser';
@@ -46,6 +47,7 @@ export default function LoginPage() {
   const [tab, setTab] = useState('mentor');
   const [showAdminKey, setShowAdminKey] = useState(false);
   const [adminPass, setAdminPass] = useState('');
+  const [centerName, setCenterName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -76,6 +78,16 @@ export default function LoginPage() {
   const clearMessages = () => { setError(''); setSuccess(''); };
   const err  = (msg) => { setError(msg);   setLoading(false); };
   const succ = (msg) => { setSuccess(msg); setLoading(false); };
+
+  // Center nomini URL dan olamiz
+  useEffect(() => {
+    const pathCenterId = window.location.pathname.split('/center/')[1]?.split('/')[0];
+    if (pathCenterId) {
+      axios.get(`/api/center-info/${pathCenterId}`)
+        .then(r => setCenterName(r.data.name))
+        .catch(() => setCenterName(''));
+    }
+  }, []);
 
   // ── ADMIN ──
   const handleAdminLogin = async () => {
@@ -119,6 +131,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       // 1. Backend dan kod olish
+      const pathCenterId = window.location.pathname.split('/center/')[1]?.split('/')[0];
+      const center_id = pathCenterId || localStorage.getItem('center_id');
       const res = await API.post('/auth/register/send-code', {
         login:      regData.login,
         full_name:  regData.full_name,
@@ -126,6 +140,7 @@ export default function LoginPage() {
         email:      regData.email,
         group_name: regData.group_name,
         password:   regData.password,
+        center_id,
       });
 
       // 2. EmailJS orqali frontenddan yuborish
@@ -229,8 +244,8 @@ export default function LoginPage() {
             fontFamily: 'var(--font2)', fontSize: '28px', fontWeight: '800',
             background: 'linear-gradient(135deg, var(--text), var(--accent))',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
-          }}>Ustoz Yordamchi AI</h1>
-          <p style={{ color: 'var(--text3)', fontSize: '14px', marginTop: '6px' }}>ITpark — O'quvchilar platformasi</p>
+          }}>{centerName || 'Ustoz Yordamchi AI'}</h1>
+          <p style={{ color: 'var(--text3)', fontSize: '14px', marginTop: '6px' }}>{centerName ? `${centerName} — O'quvchilar platformasi` : "O'quvchilar platformasi"}</p>
         </div>
 
         <div className="card" style={{ borderRadius: '20px', padding: '28px', position: 'relative' }}>
@@ -518,7 +533,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '12px', marginTop: '16px' }}>
-          © 2024 Ustoz Yordamchi AI · ITpark
+          © 2024 {centerName || 'Ustoz Yordamchi AI'}
         </p>
       </div>
     </div>
