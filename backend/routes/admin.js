@@ -11,9 +11,9 @@ router.get('/dashboard', async (req, res) => {
   try {
     const [students, mentors, groups, activeGroups] = await Promise.all([
       db.query('SELECT COUNT(*) FROM users WHERE is_verified=true'),
-      db.query('SELECT COUNT(*) FROM mentors WHERE is_active=true'),
-      db.query('SELECT COUNT(*) FROM groups'),
-      db.query('SELECT COUNT(*) FROM groups WHERE is_active=true')
+      db.query('SELECT COUNT(*) FROM mentors WHERE is_active=true AND center_id=$1', [req.user.center_id]),
+      db.query('SELECT COUNT(*) FROM groups WHERE center_id=$1', [req.user.center_id]),
+      db.query('SELECT COUNT(*) FROM groups WHERE is_active=true AND center_id=$1', [req.user.center_id])
     ]);
     const groupList = await db.query(`
       SELECT g.*, m.full_name as mentor_name,
@@ -54,8 +54,8 @@ router.post('/mentors', async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10);
     const mentor = await db.query(
-      'INSERT INTO mentors (full_name, phone, password_hash) VALUES ($1, $2, $3) RETURNING *',
-      [full_name, phone, hash]
+      'INSERT INTO mentors (full_name, phone, password_hash, center_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [full_name, phone, hash, req.user.center_id]
     );
     
     // Assign groups
@@ -105,7 +105,7 @@ router.post('/groups', async (req, res) => {
   const db = req.app.get('db');
   try {
     const result = await db.query(
-      `INSERT INTO groups (name, mentor_id, lesson_days, lesson_time, start_date, end_date, subject)
+      `INSERT INTO groups (name, mentor_id, lesson_days, lesson_time, start_date, end_date, subject, center_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [name, mentor_id, lesson_days, lesson_time, start_date, end_date, subject]
     );
@@ -186,7 +186,7 @@ router.put('/students/:id', async (req, res) => {
 
     // Guruh o'zgargan bo'lsa group_members ni ham yangilash
     if (group_name) {
-      const grp = await db.query('SELECT id FROM groups WHERE name=$1', [group_name]);
+      const grp = await db.query('SELECT id FROM groups WHERE name=$1 AND center_id=$2', [group_name, req.user.center_id]);
       if (!grp.rows.length) return res.status(400).json({ error: 'Guruh topilmadi' });
       const newGroupId = grp.rows[0].id;
 
