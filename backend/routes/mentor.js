@@ -1,21 +1,31 @@
 const router = require('express').Router();
 const auth = require('../middleware/auth');
+const bcrypt = require('bcryptjs');
 
 router.use(auth(['mentor']));
 
+// ─────────────────────────────────────────────
 // Mentor dashboard
+// ─────────────────────────────────────────────
 router.get('/dashboard', async (req, res) => {
   const db = req.app.get('db');
   const mentorId = req.user.id;
+  const cid = req.user.center_id;
   try {
+    // FIX: center_id ham tekshiriladi
     const groups = await db.query(
       `SELECT g.*, (SELECT COUNT(*) FROM group_members WHERE group_id=g.id) as member_count
-       FROM groups g WHERE g.mentor_id=$1`, [mentorId]
+       FROM groups g
+       WHERE g.mentor_id=$1 AND g.center_id=$2 AND g.is_active=true`,
+      [mentorId, cid]
     );
     const totalStudents = groups.rows.reduce((a, b) => a + parseInt(b.member_count), 0);
     const events = await db.query(
       `SELECT ce.* FROM calendar_events ce
-       JOIN groups g ON ce.group_id=g.id WHERE g.mentor_id=$1 ORDER BY event_date`, [mentorId]
+       JOIN groups g ON ce.group_id=g.id
+       WHERE g.mentor_id=$1 AND g.center_id=$2
+       ORDER BY event_date`,
+      [mentorId, cid]
     );
     res.json({ groups: groups.rows, total_students: totalStudents, calendar: events.rows });
   } catch (e) {
@@ -23,13 +33,19 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-// Get mentor's groups
+// ─────────────────────────────────────────────
+// Get mentor's groups (faqat o'z markazi)
+// ─────────────────────────────────────────────
 router.get('/groups', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: center_id filter qo'shildi
     const result = await db.query(
       `SELECT g.*, (SELECT COUNT(*) FROM group_members WHERE group_id=g.id) as member_count
-       FROM groups g WHERE g.mentor_id=$1`, [req.user.id]
+       FROM groups g
+       WHERE g.mentor_id=$1 AND g.center_id=$2 AND g.is_active=true`,
+      [req.user.id, cid]
     );
     res.json(result.rows);
   } catch (e) {
@@ -37,14 +53,25 @@ router.get('/groups', async (req, res) => {
   }
 });
 
-// Get group members
+// ─────────────────────────────────────────────
+// Get group members (guruh shu markazga tegishli bo'lishi kerak)
+// ─────────────────────────────────────────────
 router.get('/groups/:id/members', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: guruh mentor va markaz bilan tekshiriladi
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.id, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     const result = await db.query(
       `SELECT u.id, u.full_name, u.email, u.phone, gm.joined_at
        FROM group_members gm JOIN users u ON gm.user_id=u.id
-       WHERE gm.group_id=$1 ORDER BY u.full_name`, [req.params.id]
+       WHERE gm.group_id=$1 ORDER BY u.full_name`,
+      [req.params.id]
     );
     res.json(result.rows);
   } catch (e) {
@@ -52,30 +79,51 @@ router.get('/groups/:id/members', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // Remove student from group
+// ─────────────────────────────────────────────
 router.delete('/groups/:groupId/members/:userId', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
-    await db.query('DELETE FROM group_members WHERE group_id=$1 AND user_id=$2',
-      [req.params.groupId, req.params.userId]);
+    // FIX: guruh shu mentorga tegishli ekanligini tekshirish
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.groupId, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
+    await db.query(
+      'DELETE FROM group_members WHERE group_id=$1 AND user_id=$2',
+      [req.params.groupId, req.params.userId]
+    );
     res.json({ message: "O'quvchi guruhdan chiqarildi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+// ─────────────────────────────────────────────
 // Get group schedule (jadval)
+// ─────────────────────────────────────────────
 router.get('/groups/:id/schedule', async (req, res) => {
   const db = req.app.get('db');
   const groupId = req.params.id;
+  const cid = req.user.center_id;
   try {
-    const group = await db.query('SELECT * FROM groups WHERE id=$1', [groupId]);
+    // FIX: guruh mentor va markaz bilan tekshiriladi
+    const group = await db.query(
+      'SELECT * FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [groupId, req.user.id, cid]
+    );
+    if (!group.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     const members = await db.query(
       `SELECT u.id, u.full_name FROM group_members gm JOIN users u ON gm.user_id=u.id WHERE gm.group_id=$1`,
       [groupId]
     );
     const assignments = await db.query(
-      `SELECT a.*, 
+      `SELECT a.*,
         json_agg(json_build_object('user_id',s.user_id,'score',s.score,'submitted_at',s.submitted_at,'id',s.id,'content',s.content,'mentor_feedback',s.mentor_feedback)) as submissions
        FROM assignments a
        LEFT JOIN submissions s ON a.id=s.assignment_id
@@ -97,10 +145,22 @@ router.get('/groups/:id/schedule', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // Update score
+// ─────────────────────────────────────────────
 router.put('/scores/:id', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: score shu mentorning guruhiga tegishli ekanligini tekshirish
+    const scoreCheck = await db.query(
+      `SELECT sc.id FROM scores sc
+       JOIN groups g ON sc.group_id=g.id
+       WHERE sc.id=$1 AND g.mentor_id=$2 AND g.center_id=$3`,
+      [req.params.id, req.user.id, cid]
+    );
+    if (!scoreCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     const result = await db.query(
       'UPDATE scores SET score=$1 WHERE id=$2 RETURNING *',
       [req.body.score, req.params.id]
@@ -111,10 +171,20 @@ router.put('/scores/:id', async (req, res) => {
   }
 });
 
-// ── JADVAL TOZALASH (barcha scores=0 ga tushiradi) ──
+// ─────────────────────────────────────────────
+// Jadval tozalash
+// ─────────────────────────────────────────────
 router.post('/groups/:id/schedule/clear', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: guruh mentor va markaz bilan tekshiriladi
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.id, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     await db.query('UPDATE scores SET score=0, updated_at=NOW() WHERE group_id=$1', [req.params.id]);
     res.json({ message: 'Jadval tozalandi' });
   } catch (e) {
@@ -122,23 +192,32 @@ router.post('/groups/:id/schedule/clear', async (req, res) => {
   }
 });
 
-// ── SUBMISSION O'CHIRISH (jadvalda baho qo'yilgan o'quvchi javobi) ──
+// ─────────────────────────────────────────────
+// Submission o'chirish
+// ─────────────────────────────────────────────
 router.delete('/submissions/:id', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
-    // submission ma'lumotini olamiz
     const sub = await db.query('SELECT * FROM submissions WHERE id=$1', [req.params.id]);
     if (!sub.rows[0]) return res.status(404).json({ error: 'Topilmadi' });
     const s = sub.rows[0];
-    // scores jadvalidan ham o'chiramiz
-    const asgn = await db.query('SELECT * FROM assignments WHERE id=$1', [s.assignment_id]);
-    if (asgn.rows[0]) {
-      const lessonDate = asgn.rows[0].lesson_date || asgn.rows[0].due_date;
-      await db.query(
-        'DELETE FROM scores WHERE user_id=$1 AND group_id=$2 AND lesson_date=$3',
-        [s.user_id, asgn.rows[0].group_id, lessonDate]
-      );
-    }
+
+    // FIX: assignment shu mentorning guruhiga tegishli ekanligini tekshirish
+    const asgn = await db.query(
+      `SELECT a.* FROM assignments a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.id=$1 AND g.mentor_id=$2 AND g.center_id=$3`,
+      [s.assignment_id, req.user.id, cid]
+    );
+    if (!asgn.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
+    const a = asgn.rows[0];
+    const lessonDate = a.lesson_date || a.due_date;
+    await db.query(
+      'DELETE FROM scores WHERE user_id=$1 AND group_id=$2 AND lesson_date=$3',
+      [s.user_id, a.group_id, lessonDate]
+    );
     await db.query('DELETE FROM submissions WHERE id=$1', [req.params.id]);
     res.json({ message: "Javob o'chirildi" });
   } catch (e) {
@@ -146,28 +225,32 @@ router.delete('/submissions/:id', async (req, res) => {
   }
 });
 
-// Add classwork assignment (kodli yoki IQ)
+// ─────────────────────────────────────────────
+// Add classwork assignment
+// ─────────────────────────────────────────────
 router.post('/assignments/classwork', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   const { group_id, title, description, lesson_date, duration_minutes, classwork_type, correct_answer, max_score } = req.body;
-  // classwork_type: 'code' | 'iq'
   try {
+    // FIX: guruh shu mentorga va shu markazga tegishli ekanligini tekshirish
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [group_id, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Bu guruh sizga tegishli emas" });
+
     const result = await db.query(
       `INSERT INTO assignments (group_id, mentor_id, title, description, type, lesson_date, duration_minutes, classwork_type, correct_answer, max_score)
        VALUES ($1,$2,$3,$4,'classwork',$5,$6,$7,$8,$9) RETURNING *`,
       [group_id, req.user.id, title, description, lesson_date, duration_minutes,
        classwork_type || 'code', correct_answer || null, max_score || 10]
     );
-    
-    // Auto-close after duration
+
     if (duration_minutes) {
       setTimeout(async () => {
         try {
-          const a = await db.query('SELECT * FROM assignments WHERE id=$1', [result.rows[0].id]);
-          if (!a.rows[0]) return;
           await db.query('UPDATE assignments SET is_open=false WHERE id=$1', [result.rows[0].id]);
-          
-          // IQ savolda: vaqt tugaganda to'g'ri javob yuborgan o'quvchilarga avtomatik ball
           if ((classwork_type || 'code') === 'iq' && correct_answer) {
             const subs = await db.query('SELECT * FROM submissions WHERE assignment_id=$1', [result.rows[0].id]);
             const ballPerCorrect = parseInt(max_score) || 10;
@@ -175,7 +258,6 @@ router.post('/assignments/classwork', async (req, res) => {
               const userAnswer = (sub.content || '').trim().toLowerCase();
               const correctAns = correct_answer.trim().toLowerCase();
               if (userAnswer === correctAns) {
-                // Ball qo'yamiz
                 await db.query(
                   'UPDATE submissions SET score=$1, mentor_feedback=$2 WHERE id=$3',
                   [ballPerCorrect, "✅ To'g'ri javob!", sub.id]
@@ -195,23 +277,36 @@ router.post('/assignments/classwork', async (req, res) => {
               }
             }
           }
-        } catch(err) { console.error('Auto-close error:', err); }
+        } catch (err) { console.error('Auto-close error:', err); }
       }, duration_minutes * 60 * 1000);
     }
-    
+
     res.json(result.rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+// ─────────────────────────────────────────────
 // Get assignment submissions
+// ─────────────────────────────────────────────
 router.get('/assignments/:id/submissions', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: assignment shu mentorning guruhiga tegishli ekanligini tekshirish
+    const aCheck = await db.query(
+      `SELECT a.id FROM assignments a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.id=$1 AND g.mentor_id=$2 AND g.center_id=$3`,
+      [req.params.id, req.user.id, cid]
+    );
+    if (!aCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     const result = await db.query(
       `SELECT s.*, u.full_name, u.email FROM submissions s
-       JOIN users u ON s.user_id=u.id WHERE s.assignment_id=$1`, [req.params.id]
+       JOIN users u ON s.user_id=u.id WHERE s.assignment_id=$1`,
+      [req.params.id]
     );
     res.json(result.rows);
   } catch (e) {
@@ -219,21 +314,33 @@ router.get('/assignments/:id/submissions', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // Grade submission
+// ─────────────────────────────────────────────
 router.put('/submissions/:id/grade', async (req, res) => {
   const db = req.app.get('db');
   const { score, mentor_feedback } = req.body;
+  const cid = req.user.center_id;
   try {
-    const sub = await db.query(
+    const sub = await db.query('SELECT * FROM submissions WHERE id=$1', [req.params.id]);
+    if (!sub.rows[0]) return res.status(404).json({ error: 'Topilmadi' });
+
+    // FIX: assignment shu mentorning guruhiga tegishli ekanligini tekshirish
+    const asgn = await db.query(
+      `SELECT a.* FROM assignments a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.id=$1 AND g.mentor_id=$2 AND g.center_id=$3`,
+      [sub.rows[0].assignment_id, req.user.id, cid]
+    );
+    if (!asgn.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
+    const updated = await db.query(
       'UPDATE submissions SET score=$1, mentor_feedback=$2 WHERE id=$3 RETURNING *',
       [score, mentor_feedback, req.params.id]
     );
-    
-    // Update scores table
-    const s = sub.rows[0];
-    const assignment = await db.query('SELECT * FROM assignments WHERE id=$1', [s.assignment_id]);
-    const a = assignment.rows[0];
-    
+
+    const s = updated.rows[0];
+    const a = asgn.rows[0];
     const lessonDate = a.lesson_date || a.due_date;
     await db.query(
       `INSERT INTO scores (user_id, group_id, assignment_id, score, lesson_date)
@@ -242,19 +349,32 @@ router.put('/submissions/:id/grade', async (req, res) => {
        DO UPDATE SET score=$4, assignment_id=$3, updated_at=NOW()`,
       [s.user_id, a.group_id, s.assignment_id, score, lessonDate]
     );
-    
-    res.json(sub.rows[0]);
+
+    res.json(updated.rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── BARCHA SUBMISSIONLARNI TEKSHIRISH (AI bilan) ──
+// ─────────────────────────────────────────────
+// Grade all (AI bilan)
+// ─────────────────────────────────────────────
 router.post('/assignments/:id/grade-all', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: assignment shu mentorning guruhiga tegishli ekanligini tekshirish
+    const aCheck = await db.query(
+      `SELECT a.id FROM assignments a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.id=$1 AND g.mentor_id=$2 AND g.center_id=$3`,
+      [req.params.id, req.user.id, cid]
+    );
+    if (!aCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     const subs = await db.query(
-      `SELECT s.*, u.full_name FROM submissions s JOIN users u ON s.user_id=u.id WHERE s.assignment_id=$1 AND (s.score IS NULL OR s.score=0)`,
+      `SELECT s.*, u.full_name FROM submissions s JOIN users u ON s.user_id=u.id
+       WHERE s.assignment_id=$1 AND (s.score IS NULL OR s.score=0)`,
       [req.params.id]
     );
     res.json({ count: subs.rows.length, submissions: subs.rows });
@@ -263,22 +383,44 @@ router.post('/assignments/:id/grade-all', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // Delete assignment
+// ─────────────────────────────────────────────
 router.delete('/assignments/:id', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
-    await db.query('DELETE FROM assignments WHERE id=$1 AND mentor_id=$2', [req.params.id, req.user.id]);
+    // FIX: center_id ham tekshiriladi
+    const aCheck = await db.query(
+      `SELECT a.id FROM assignments a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.id=$1 AND a.mentor_id=$2 AND g.center_id=$3`,
+      [req.params.id, req.user.id, cid]
+    );
+    if (!aCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
+    await db.query('DELETE FROM assignments WHERE id=$1', [req.params.id]);
     res.json({ message: "Vazifa o'chirildi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Update schedule (jadval tahrirlash) — faqat bugungi dars kunida
+// ─────────────────────────────────────────────
+// Update schedule (jadval tahrirlash)
+// ─────────────────────────────────────────────
 router.put('/groups/:id/schedule/edit', async (req, res) => {
   const db = req.app.get('db');
   const { updates } = req.body;
+  const cid = req.user.center_id;
   try {
+    // FIX: guruh shu mentorga va markazga tegishli ekanligini tekshirish
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.id, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     for (const update of updates) {
       for (const sc of update.scores) {
         await db.query(
@@ -295,15 +437,24 @@ router.put('/groups/:id/schedule/edit', async (req, res) => {
   }
 });
 
-// ── DAVOMAT (Attendance) ──
-
-// Get attendance for a group on a specific date
+// ─────────────────────────────────────────────
+// Davomat — get
+// ─────────────────────────────────────────────
 router.get('/groups/:id/attendance', async (req, res) => {
   const db = req.app.get('db');
   const { date } = req.query;
+  const cid = req.user.center_id;
   try {
+    // FIX: guruh tekshiruvi
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.id, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     const members = await db.query(
-      `SELECT u.id, u.full_name FROM group_members gm JOIN users u ON gm.user_id=u.id WHERE gm.group_id=$1 ORDER BY u.full_name`,
+      `SELECT u.id, u.full_name FROM group_members gm JOIN users u ON gm.user_id=u.id
+       WHERE gm.group_id=$1 ORDER BY u.full_name`,
       [req.params.id]
     );
     let attendance = [];
@@ -320,11 +471,21 @@ router.get('/groups/:id/attendance', async (req, res) => {
   }
 });
 
-// Save attendance for a group on a date
+// ─────────────────────────────────────────────
+// Davomat — save
+// ─────────────────────────────────────────────
 router.post('/groups/:id/attendance', async (req, res) => {
   const db = req.app.get('db');
   const { date, records } = req.body;
+  const cid = req.user.center_id;
   try {
+    // FIX: guruh tekshiruvi
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.id, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     for (const rec of records) {
       await db.query(
         `INSERT INTO attendance (group_id, user_id, lesson_date, status, marked_by)
@@ -339,12 +500,23 @@ router.post('/groups/:id/attendance', async (req, res) => {
   }
 });
 
-// Get attendance history for a group (all dates)
+// ─────────────────────────────────────────────
+// Davomat — history
+// ─────────────────────────────────────────────
 router.get('/groups/:id/attendance/history', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: guruh tekshiruvi
+    const grpCheck = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.id, req.user.id, cid]
+    );
+    if (!grpCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     const att = await db.query(
-      `SELECT a.*, u.full_name FROM attendance a JOIN users u ON a.user_id=u.id WHERE a.group_id=$1 ORDER BY a.lesson_date DESC`,
+      `SELECT a.*, u.full_name FROM attendance a JOIN users u ON a.user_id=u.id
+       WHERE a.group_id=$1 ORDER BY a.lesson_date DESC`,
       [req.params.id]
     );
     res.json(att.rows);
@@ -353,37 +525,32 @@ router.get('/groups/:id/attendance/history', async (req, res) => {
   }
 });
 
-// Student: get own attendance for their group
-router.get('/groups/:id/attendance/mine', async (req, res) => {
-  const db = req.app.get('db');
-  try {
-    const att = await db.query(
-      `SELECT lesson_date, status FROM attendance WHERE group_id=$1 AND user_id=$2 ORDER BY lesson_date`,
-      [req.params.id, req.query.user_id]
-    );
-    res.json(att.rows);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
+// ─────────────────────────────────────────────
 // Start classwork timer
+// ─────────────────────────────────────────────
 router.post('/assignments/:id/start', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
-    const result = await db.query(
-      'UPDATE assignments SET started_at=NOW() WHERE id=$1 AND mentor_id=$2 RETURNING *',
-      [req.params.id, req.user.id]
+    // FIX: assignment shu mentorning guruhiga tegishli ekanligini tekshirish
+    const aCheck = await db.query(
+      `SELECT a.* FROM assignments a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.id=$1 AND a.mentor_id=$2 AND g.center_id=$3`,
+      [req.params.id, req.user.id, cid]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Topilmadi' });
-    
+    if (!aCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
+    const result = await db.query(
+      'UPDATE assignments SET started_at=NOW() WHERE id=$1 RETURNING *',
+      [req.params.id]
+    );
     const a = result.rows[0];
+
     if (a.duration_minutes) {
       setTimeout(async () => {
         try {
           await db.query('UPDATE assignments SET is_open=false WHERE id=$1', [a.id]);
-          
-          // IQ savolda: vaqt tugaganda avtomatik ball
           if (a.classwork_type === 'iq' && a.correct_answer) {
             const subs = await db.query('SELECT * FROM submissions WHERE assignment_id=$1', [a.id]);
             const ballPerCorrect = parseInt(a.max_score) || 10;
@@ -410,7 +577,7 @@ router.post('/assignments/:id/start', async (req, res) => {
               }
             }
           }
-        } catch(err) { console.error('Auto-close error:', err); }
+        } catch (err) { console.error('Auto-close error:', err); }
       }, a.duration_minutes * 60 * 1000);
     }
     res.json(result.rows[0]);
@@ -419,26 +586,37 @@ router.post('/assignments/:id/start', async (req, res) => {
   }
 });
 
-// ── JADVAL SANASINI YANGILASH (start_date, end_date) ──
+// ─────────────────────────────────────────────
+// Jadval sanasini yangilash
+// ─────────────────────────────────────────────
 router.put('/groups/:id/dates', async (req, res) => {
   const db = req.app.get('db');
   const { start_date, end_date } = req.body;
+  const cid = req.user.center_id;
   try {
-    // Faqat o'z guruhini yangilay oladi
-    const check = await db.query('SELECT id FROM groups WHERE id=$1 AND mentor_id=$2', [req.params.id, req.user.id]);
-    if (!check.rows[0]) return res.status(403).json({ error: 'Ruxsat yoq' });
-    await db.query('UPDATE groups SET start_date=$1, end_date=$2 WHERE id=$3', [start_date, end_date, req.params.id]);
+    // FIX: center_id ham tekshiriladi
+    const check = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [req.params.id, req.user.id, cid]
+    );
+    if (!check.rows[0]) return res.status(403).json({ error: "Ruxsat yo'q" });
+
+    await db.query(
+      'UPDATE groups SET start_date=$1, end_date=$2 WHERE id=$3',
+      [start_date, end_date, req.params.id]
+    );
     res.json({ message: "Jadval sanasi yangilandi" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+// ─────────────────────────────────────────────
 // Mentor profile - change password
+// ─────────────────────────────────────────────
 router.put('/profile/password', async (req, res) => {
   const db = req.app.get('db');
   const { old_password, new_password } = req.body;
-  const bcrypt = require('bcryptjs');
   try {
     const mentor = await db.query('SELECT * FROM mentors WHERE id=$1', [req.user.id]);
     if (!mentor.rows[0]) return res.status(404).json({ error: 'Topilmadi' });
@@ -452,7 +630,9 @@ router.put('/profile/password', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
 // Mentor profile - update avatar
+// ─────────────────────────────────────────────
 router.put('/profile/avatar', async (req, res) => {
   const db = req.app.get('db');
   const { avatar_url } = req.body;
@@ -464,11 +644,14 @@ router.put('/profile/avatar', async (req, res) => {
   }
 });
 
-// ── Guruhga qo'shilish so'rovlari ──────────────────────────────────────
-// Mening guruhlarimga kelgan so'rovlar
+// ─────────────────────────────────────────────
+// Guruhga qo'shilish so'rovlari
+// ─────────────────────────────────────────────
 router.get('/join-requests', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: center_id filter qo'shildi
     const result = await db.query(`
       SELECT jr.id, jr.status, jr.created_at,
              u.full_name, u.email, u.phone,
@@ -476,9 +659,9 @@ router.get('/join-requests', async (req, res) => {
       FROM group_join_requests jr
       JOIN users u ON jr.user_id = u.id
       JOIN groups g ON jr.group_id = g.id
-      WHERE g.mentor_id = $1 AND jr.status = 'pending'
+      WHERE g.mentor_id = $1 AND g.center_id = $2 AND jr.status = 'pending'
       ORDER BY jr.created_at DESC
-    `, [req.user.id]);
+    `, [req.user.id, cid]);
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -486,6 +669,7 @@ router.get('/join-requests', async (req, res) => {
 // So'rovni tasdiqlash
 router.put('/join-requests/:id/approve', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
     const jr = await db.query(
       'SELECT * FROM group_join_requests WHERE id=$1', [req.params.id]
@@ -493,11 +677,12 @@ router.put('/join-requests/:id/approve', async (req, res) => {
     if (!jr.rows.length) return res.status(404).json({ error: 'Topilmadi' });
     const { group_id, user_id } = jr.rows[0];
 
-    // Guruh mentori ekanligini tekshirish
-    const grp = await db.query('SELECT mentor_id FROM groups WHERE id=$1', [group_id]);
-    if (!grp.rows.length || String(grp.rows[0].mentor_id) !== String(req.user.id)) {
-      return res.status(403).json({ error: "Ruxsat yo'q" });
-    }
+    // FIX: guruh mentor va markaz bilan tekshiriladi
+    const grp = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [group_id, req.user.id, cid]
+    );
+    if (!grp.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
 
     await db.query(
       'INSERT INTO group_members (group_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
@@ -511,10 +696,38 @@ router.put('/join-requests/:id/approve', async (req, res) => {
 // So'rovni rad etish
 router.put('/join-requests/:id/reject', async (req, res) => {
   const db = req.app.get('db');
+  const cid = req.user.center_id;
   try {
+    // FIX: faqat shu mentorning guruhiga kelgan so'rovni rad etish
+    const jr = await db.query('SELECT * FROM group_join_requests WHERE id=$1', [req.params.id]);
+    if (!jr.rows.length) return res.status(404).json({ error: 'Topilmadi' });
+
+    const grp = await db.query(
+      'SELECT id FROM groups WHERE id=$1 AND mentor_id=$2 AND center_id=$3',
+      [jr.rows[0].group_id, req.user.id, cid]
+    );
+    if (!grp.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
     await db.query("UPDATE group_join_requests SET status='rejected' WHERE id=$1", [req.params.id]);
     res.json({ success: true, message: 'Rad etildi' });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// Student: get own attendance (mine)
+// ─────────────────────────────────────────────
+router.get('/groups/:id/attendance/mine', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const att = await db.query(
+      `SELECT lesson_date, status FROM attendance
+       WHERE group_id=$1 AND user_id=$2 ORDER BY lesson_date`,
+      [req.params.id, req.query.user_id]
+    );
+    res.json(att.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
