@@ -151,34 +151,24 @@ router.post('/login/admin', async (req, res) => {
   const { username, password, center_id } = req.body;
   const db = req.app.get('db');
   try {
-    let result;
-    if (center_id) {
-      // center_id berilgan bo'lsa - shu markaz admini
-      // username berilgan bo'lsa username bilan, bo'lmasa faqat center_id bilan
-      if (username) {
-        result = await db.query(
-          'SELECT * FROM admins WHERE (username=$1 OR login=$1) AND center_id=$2 AND is_active=true',
-          [username, center_id]
-        );
-      } else {
-        result = await db.query(
-          'SELECT * FROM admins WHERE center_id=$1 AND is_active=true ORDER BY id LIMIT 1',
-          [center_id]
-        );
-      }
-    } else {
-      // center_id yo'q - global admin (eski tizim)
-      result = await db.query(
-        'SELECT * FROM admins WHERE (username=$1 OR login=$1) AND (center_id IS NULL) AND is_active=true',
-        [username || '']
-      );
-      if (!result.rows.length) {
-        result = await db.query(
-          'SELECT * FROM admins WHERE username=$1',
-          [username || '']
-        );
-      }
+    // center_id majburiy - bo'lmasa xato
+    if (!center_id) {
+      return res.status(400).json({ error: "center_id ko'rsatilmagan" });
     }
+
+    // Avval center mavjud va faolligini tekshiramiz
+    const centerCheck = await db.query(
+      'SELECT id FROM centers WHERE id=$1 AND is_active=true', [center_id]
+    );
+    if (!centerCheck.rows.length) {
+      return res.status(404).json({ error: "Bu o'quv markaz mavjud emas yoki faol emas" });
+    }
+
+    // Faqat shu center ga tegishli admin
+    const result = await db.query(
+      'SELECT * FROM admins WHERE center_id=$1 AND is_active=true ORDER BY id LIMIT 1',
+      [center_id]
+    );
     if (!result.rows.length) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
 
     const admin = result.rows[0];
