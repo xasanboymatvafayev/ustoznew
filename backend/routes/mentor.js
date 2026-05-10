@@ -496,7 +496,7 @@ router.put('/join-requests/:id/approve', async (req, res) => {
     // Guruh mentori ekanligini tekshirish
     const grp = await db.query('SELECT mentor_id FROM groups WHERE id=$1', [group_id]);
     if (!grp.rows.length || String(grp.rows[0].mentor_id) !== String(req.user.id)) {
-      return res.status(403).json({ error: 'Ruxsat yo'q' });
+      return res.status(403).json({ error: "Ruxsat yo'q" });
     }
 
     await db.query(
