@@ -144,6 +144,17 @@ router.post('/login/mentor', async (req, res) => {
   }
 });
 
+
+// DEBUG - center_admins tekshirish (keyinchalik o'chiriladi)
+router.get('/debug/center/:id', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const ca = await db.query('SELECT id, center_id, full_name, is_active, length(password_hash) as hash_len FROM center_admins WHERE center_id=$1', [req.params.id]);
+    const c  = await db.query('SELECT id, name, is_active FROM centers WHERE id=$1', [req.params.id]);
+    res.json({ center: c.rows[0] || null, center_admin: ca.rows[0] || null });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─────────────────────────────────────────────
 // ADMIN LOGIN
 // ─────────────────────────────────────────────
@@ -156,7 +167,7 @@ router.post('/login/admin', async (req, res) => {
       return res.status(400).json({ error: "center_id ko'rsatilmagan" });
     }
 
-    // Avval center mavjud va faolligini tekshiramiz
+    // Center mavjud va faolligini tekshiramiz
     const centerCheck = await db.query(
       'SELECT id FROM centers WHERE id=$1 AND is_active=true', [center_id]
     );
@@ -164,25 +175,26 @@ router.post('/login/admin', async (req, res) => {
       return res.status(404).json({ error: "Bu o'quv markaz mavjud emas yoki faol emas" });
     }
 
-    // Faqat shu center ga tegishli admin
+    // center_admins jadvalidan parolni olamiz
     const result = await db.query(
-      'SELECT * FROM admins WHERE center_id=$1 AND is_active=true ORDER BY id LIMIT 1',
+      'SELECT * FROM center_admins WHERE center_id=$1 AND is_active=true LIMIT 1',
       [center_id]
     );
-    if (!result.rows.length) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
+    if (!result.rows.length) {
+      return res.status(401).json({ error: "Admin paroli topilmadi" });
+    }
 
     const admin = result.rows[0];
     if (!password) return res.status(400).json({ error: 'Parol kiritilmagan' });
-    if (!admin.password_hash) return res.status(500).json({ error: 'Admin paroli sozlanmagan' });
     const valid = await bcrypt.compare(String(password), admin.password_hash);
     if (!valid) return res.status(401).json({ error: "Parol noto'g'ri" });
 
     const token = jwt.sign(
-      { id: admin.id, role: 'admin', center_id: admin.center_id },
+      { id: admin.id, role: 'admin', center_id: Number(center_id) },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
-    res.json({ token, role: 'admin', center_id: admin.center_id });
+    res.json({ token, role: 'admin', center_id: Number(center_id) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
