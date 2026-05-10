@@ -575,7 +575,8 @@ function AdminPackages({ data, reload }) {
   const limitLabel = (val) => val === -1 ? 'Cheksiz' : val;
 
   const handleChangePackage = async () => {
-    if (!confirmKey || confirmKey !== selectedKey) return;
+    const pkgName = packages.find(p => p.key === selectedKey)?.name;
+    if (!confirmKey || confirmKey !== pkgName) return;
     setChanging(true); setMsg(''); setErr('');
     try {
       const r = await API.post('/admin/change-package', { package_key: selectedKey });
