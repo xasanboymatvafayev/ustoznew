@@ -464,4 +464,57 @@ router.put('/profile/avatar', async (req, res) => {
   }
 });
 
+// ── Guruhga qo'shilish so'rovlari ──────────────────────────────────────
+// Mening guruhlarimga kelgan so'rovlar
+router.get('/join-requests', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const result = await db.query(`
+      SELECT jr.id, jr.status, jr.created_at,
+             u.full_name, u.email, u.phone,
+             g.name as group_name, g.id as group_id
+      FROM group_join_requests jr
+      JOIN users u ON jr.user_id = u.id
+      JOIN groups g ON jr.group_id = g.id
+      WHERE g.mentor_id = $1 AND jr.status = 'pending'
+      ORDER BY jr.created_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// So'rovni tasdiqlash
+router.put('/join-requests/:id/approve', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    const jr = await db.query(
+      'SELECT * FROM group_join_requests WHERE id=$1', [req.params.id]
+    );
+    if (!jr.rows.length) return res.status(404).json({ error: 'Topilmadi' });
+    const { group_id, user_id } = jr.rows[0];
+
+    // Guruh mentori ekanligini tekshirish
+    const grp = await db.query('SELECT mentor_id FROM groups WHERE id=$1', [group_id]);
+    if (!grp.rows.length || String(grp.rows[0].mentor_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Ruxsat yo'q' });
+    }
+
+    await db.query(
+      'INSERT INTO group_members (group_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+      [group_id, user_id]
+    );
+    await db.query("UPDATE group_join_requests SET status='approved' WHERE id=$1", [req.params.id]);
+    res.json({ success: true, message: 'Tasdiqlandi' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// So'rovni rad etish
+router.put('/join-requests/:id/reject', async (req, res) => {
+  const db = req.app.get('db');
+  try {
+    await db.query("UPDATE group_join_requests SET status='rejected' WHERE id=$1", [req.params.id]);
+    res.json({ success: true, message: 'Rad etildi' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
