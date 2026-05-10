@@ -125,18 +125,44 @@ router.post('/register/re-verify', async (req, res) => {
 // STUDENT LOGIN
 // ─────────────────────────────────────────────
 router.post('/login/student', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, center_id } = req.body;
   const db = req.app.get('db');
   try {
-    const result = await db.query('SELECT * FROM users WHERE email=$1 AND is_verified=true', [email]);
-    if (!result.rows.length) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
+    // Agar center_id berilgan bo'lsa, faqat shu markazning o'quvchisi kirsin
+    let result;
+    if (center_id) {
+      const cid = parseInt(center_id);
+      result = await db.query(
+        'SELECT * FROM users WHERE email=$1 AND is_verified=true AND center_id=$2',
+        [email, cid]
+      );
+      if (!result.rows.length) {
+        return res.status(401).json({ error: "Bu markaz bilan bog'liq foydalanuvchi topilmadi" });
+      }
+    } else {
+      result = await db.query('SELECT * FROM users WHERE email=$1 AND is_verified=true', [email]);
+      if (!result.rows.length) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
+    }
 
     const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Parol noto\'g\'ri' });
 
-    const token = jwt.sign({ id: user.id, role: 'student', email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user.id, full_name: user.full_name, email: user.email, role: 'student' } });
+    const token = jwt.sign(
+      { id: user.id, role: 'student', email: user.email, center_id: user.center_id },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        role: 'student',
+        center_id: user.center_id
+      }
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -146,18 +172,44 @@ router.post('/login/student', async (req, res) => {
 // MENTOR LOGIN
 // ─────────────────────────────────────────────
 router.post('/login/mentor', async (req, res) => {
-  const { phone, password } = req.body;
+  const { phone, password, center_id } = req.body;
   const db = req.app.get('db');
   try {
-    const result = await db.query('SELECT * FROM mentors WHERE phone=$1 AND is_active=true', [phone]);
-    if (!result.rows.length) return res.status(401).json({ error: 'Mentor topilmadi' });
+    // Agar center_id berilgan bo'lsa, faqat shu markazning mentori kirsin
+    let result;
+    if (center_id) {
+      const cid = parseInt(center_id);
+      result = await db.query(
+        'SELECT * FROM mentors WHERE phone=$1 AND is_active=true AND center_id=$2',
+        [phone, cid]
+      );
+      if (!result.rows.length) {
+        return res.status(401).json({ error: "Bu markaz bilan bog'liq mentor topilmadi" });
+      }
+    } else {
+      result = await db.query('SELECT * FROM mentors WHERE phone=$1 AND is_active=true', [phone]);
+      if (!result.rows.length) return res.status(401).json({ error: 'Mentor topilmadi' });
+    }
 
     const mentor = result.rows[0];
     const valid = await bcrypt.compare(password, mentor.password_hash);
     if (!valid) return res.status(401).json({ error: 'Parol noto\'g\'ri' });
 
-    const token = jwt.sign({ id: mentor.id, role: 'mentor', phone }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, mentor: { id: mentor.id, full_name: mentor.full_name, phone: mentor.phone, role: 'mentor' } });
+    const token = jwt.sign(
+      { id: mentor.id, role: 'mentor', phone, center_id: mentor.center_id },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({
+      token,
+      mentor: {
+        id: mentor.id,
+        full_name: mentor.full_name,
+        phone: mentor.phone,
+        role: 'mentor',
+        center_id: mentor.center_id
+      }
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
