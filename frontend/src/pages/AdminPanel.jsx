@@ -10,6 +10,7 @@ const Sidebar = ({ active, setActive, logout }) => {
     { id: 'groups', icon: '🏫', label: 'Guruhlar' },
     { id: 'students', icon: '🎓', label: 'O\'quvchilar' },
     { id: 'calendar', icon: '📅', label: 'Kalendar' },
+    { id: 'packages', icon: '📦', label: 'Paketlar' },
   ];
   return (
     <div className="sidebar">
@@ -49,6 +50,7 @@ export default function AdminPanel() {
   const [mentors, setMentors] = useState([]);
   const [groups, setGroups] = useState([]);
   const [students, setStudents] = useState([]);
+  const [packageData, setPackageData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState(null);
   const { logout } = useAuth();
@@ -74,6 +76,10 @@ export default function AdminPanel() {
         const r = await API.get('/admin/students');
         setStudents(r.data);
       }
+      if (active === 'packages') {
+        const r = await API.get('/admin/my-center');
+        setPackageData(r.data);
+      }
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -89,6 +95,7 @@ export default function AdminPanel() {
             {active === 'groups' && <AdminGroups groups={groups} mentors={mentors} reload={loadData} />}
             {active === 'students' && <AdminStudents students={students} reload={loadData} />}
             {active === 'calendar' && <AdminCalendar groups={groups} />}
+            {active === 'packages' && <AdminPackages data={packageData} reload={loadData} />}
           </>
         )}
       </main>
@@ -545,7 +552,212 @@ function AdminStudents({ students, reload }) {
   );
 }
 
-// ===== CALENDAR =====
+// ===== PAKETLAR =====
+function AdminPackages({ data, reload }) {
+  const [changing, setChanging] = useState(false);
+  const [selectedKey, setSelectedKey] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [confirmKey, setConfirmKey] = useState('');
+
+  if (!data) return <div className="loading"><div className="spinner" /></div>;
+
+  const { center, usage, packages } = data;
+
+  const PACKAGE_COLORS = {
+    free:      { bg: '#e8f5e9', color: '#2e7d32', border: '#a5d6a7' },
+    pro:       { bg: '#e3f2fd', color: '#1565c0', border: '#90caf9' },
+    unlimited: { bg: '#f3e5f5', color: '#6a1b9a', border: '#ce93d8' },
+  };
+
+  const PACKAGE_ICONS = { free: '🆓', pro: '⭐', unlimited: '♾️' };
+
+  const limitLabel = (val) => val === -1 ? 'Cheksiz' : val;
+
+  const handleChangePackage = async () => {
+    if (!confirmKey || confirmKey !== selectedKey) return;
+    setChanging(true); setMsg(''); setErr('');
+    try {
+      const r = await API.post('/admin/change-package', { package_key: selectedKey });
+      setMsg(r.data.message);
+      setSelectedKey('');
+      setConfirmKey('');
+      reload();
+    } catch (e) {
+      setErr(e.response?.data?.error || 'Xatolik yuz berdi');
+    }
+    setChanging(false);
+  };
+
+  const currentPkg = packages.find(p => p.key === center.package_key);
+
+  return (
+    <div className="fade-in">
+      <div className="page-header">
+        <h2>📦 Paketlar</h2>
+        <p>Joriy obuna holati va paketni o'zgartirish</p>
+      </div>
+
+      {/* Joriy holat */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <h3 style={{ marginBottom: '16px', fontFamily: 'var(--font2)' }}>📊 Joriy holat</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+          {[
+            { label: 'Faol guruhlar', used: usage.groups_count, max: currentPkg?.max_groups, icon: '🏫' },
+            { label: 'Faol mentorlar', used: usage.mentors_count, max: currentPkg?.max_mentors, icon: '👨‍🏫' },
+            { label: 'O\'quvchilar', used: usage.students_count, max: currentPkg?.max_students, icon: '🎓' },
+          ].map((item, i) => {
+            const maxVal = item.max === -1 ? null : item.max;
+            const pct = maxVal ? Math.min(100, Math.round(item.used / maxVal * 100)) : 0;
+            const overLimit = maxVal && item.used >= maxVal;
+            return (
+              <div key={i} style={{
+                padding: '16px', borderRadius: '12px',
+                background: overLimit ? '#fff3e0' : 'var(--bg2)',
+                border: `1px solid ${overLimit ? '#ffb74d' : 'var(--border)'}`,
+              }}>
+                <div style={{ fontSize: '22px', marginBottom: '6px' }}>{item.icon}</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: overLimit ? '#e65100' : 'var(--text)' }}>
+                  {item.used} <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text3)' }}>/ {limitLabel(item.max)}</span>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>{item.label}</div>
+                {maxVal && (
+                  <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)' }}>
+                    <div style={{ height: '100%', borderRadius: '2px', width: `${pct}%`, background: overLimit ? '#ff9800' : 'var(--accent)', transition: 'width .3s' }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
+          background: PACKAGE_COLORS[center.package_key]?.bg || 'var(--bg2)',
+          border: `1px solid ${PACKAGE_COLORS[center.package_key]?.border || 'var(--border)'}`,
+          borderRadius: '10px',
+        }}>
+          <span style={{ fontSize: '24px' }}>{PACKAGE_ICONS[center.package_key] || '📦'}</span>
+          <div>
+            <div style={{ fontWeight: 700, color: PACKAGE_COLORS[center.package_key]?.color, fontSize: '15px' }}>
+              {center.package_name} paketi
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)' }}>
+              {center.subscription_until
+                ? `Obuna: ${new Date(center.subscription_until).toLocaleDateString('uz-UZ')}`
+                : center.trial_ends_at
+                ? `Trial: ${new Date(center.trial_ends_at).toLocaleDateString('uz-UZ')}`
+                : 'Doimiy faol'}
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '16px', color: PACKAGE_COLORS[center.package_key]?.color }}>
+            {currentPkg?.price > 0 ? `${currentPkg.price.toLocaleString()} so'm/oy` : 'Bepul'}
+          </div>
+        </div>
+      </div>
+
+      {/* Paketlar taqqoslash */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font2)' }}>📋 Barcha paketlar</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          {packages.map(pkg => {
+            const colors = PACKAGE_COLORS[pkg.key] || { bg: 'var(--bg2)', color: 'var(--text)', border: 'var(--border)' };
+            const isCurrent = pkg.key === center.package_key;
+            const isSelected = selectedKey === pkg.key;
+            return (
+              <div key={pkg.id} onClick={() => !isCurrent && setSelectedKey(isSelected ? '' : pkg.key)}
+                style={{
+                  padding: '20px', borderRadius: '14px', cursor: isCurrent ? 'default' : 'pointer',
+                  background: isSelected ? colors.bg : isCurrent ? colors.bg : 'var(--bg2)',
+                  border: `2px solid ${isSelected || isCurrent ? colors.border : 'var(--border)'}`,
+                  transition: 'all .2s', position: 'relative',
+                  transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                }}>
+                {isCurrent && (
+                  <div style={{
+                    position: 'absolute', top: '-10px', right: '12px',
+                    background: colors.color, color: '#fff', fontSize: '11px',
+                    padding: '2px 10px', borderRadius: '20px', fontWeight: 600,
+                  }}>Joriy</div>
+                )}
+                <div style={{ fontSize: '28px', marginBottom: '8px' }}>{PACKAGE_ICONS[pkg.key] || '📦'}</div>
+                <div style={{ fontWeight: 700, fontSize: '18px', color: colors.color, marginBottom: '4px' }}>{pkg.name}</div>
+                <div style={{ fontWeight: 700, fontSize: '20px', marginBottom: '16px' }}>
+                  {pkg.price > 0 ? `${pkg.price.toLocaleString()} so'm` : 'Bepul'}
+                  {pkg.price > 0 && <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text3)' }}>/oy</span>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                  {[
+                    { icon: '🏫', label: 'Guruhlar', val: pkg.max_groups },
+                    { icon: '👨‍🏫', label: 'Mentorlar', val: pkg.max_mentors },
+                    { icon: '🎓', label: 'O\'quvchilar', val: pkg.max_students },
+                  ].map((f, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--text2)' }}>{f.icon} {f.label}</span>
+                      <span style={{ fontWeight: 600, color: f.val === -1 ? colors.color : 'var(--text)' }}>
+                        {limitLabel(f.val)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {!isCurrent && (
+                  <div style={{
+                    marginTop: '16px', padding: '8px', borderRadius: '8px', textAlign: 'center',
+                    fontSize: '12px', fontWeight: 600,
+                    background: isSelected ? colors.color : 'transparent',
+                    color: isSelected ? '#fff' : colors.color,
+                    border: `1px solid ${colors.color}`,
+                  }}>
+                    {isSelected ? '✓ Tanlandi' : 'Tanlash'}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* O'zgartirish tugmasi */}
+      {selectedKey && (
+        <div className="card">
+          <h3 style={{ marginBottom: '16px', fontFamily: 'var(--font2)' }}>
+            🔄 {packages.find(p => p.key === selectedKey)?.name} paketiga o'tish
+          </h3>
+          {msg && <div className="alert alert-success" style={{ marginBottom: '12px' }}>{msg}</div>}
+          {err && <div className="alert alert-error" style={{ marginBottom: '12px' }}>{err}</div>}
+          <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '16px' }}>
+            Tasdiqlash uchun yangi paket nomini kiriting:{' '}
+            <b style={{ color: 'var(--accent)' }}>{packages.find(p => p.key === selectedKey)?.name}</b>
+          </p>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <input
+              className="input"
+              style={{ flex: 1, maxWidth: '280px' }}
+              placeholder={`"${packages.find(p => p.key === selectedKey)?.name}" deb yozing`}
+              value={confirmKey}
+              onChange={e => setConfirmKey(e.target.value)}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={handleChangePackage}
+              disabled={changing || confirmKey !== packages.find(p => p.key === selectedKey)?.name}
+            >
+              {changing ? '⏳ O\'zgartirilmoqda...' : '✅ Tasdiqlash'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => { setSelectedKey(''); setConfirmKey(''); setErr(''); }}>
+              Bekor qilish
+            </button>
+          </div>
+          {packages.find(p => p.key === selectedKey)?.price > 0 && (
+            <p style={{ marginTop: '12px', fontSize: '12px', color: 'var(--text3)' }}>
+              ⚠️ To'lovli paketga o'tgandan so'ng to'lov bo'limi orqali to'lash kerak bo'ladi.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 function AdminCalendar({ groups }) {
   const [form, setForm] = useState({ group_id: '', title: '', event_date: '' });
   const [loading, setLoading] = useState(false);
