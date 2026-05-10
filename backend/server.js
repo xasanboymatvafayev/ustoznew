@@ -37,9 +37,33 @@ app.use('/favicon.ico', express.static(require('path').join(frontendRoot, 'favic
 // /center/:centerId/* uchun ham static fayllar (ehtiyot uchun)
 app.use('/center', express.static(frontendRoot));
 
-// SPA uchun: /center/:centerId va /center/:centerId/* → index.html
-app.get('/center/:centerId', (req, res) => { res.sendFile(path.join(frontendRoot, 'index.html')); });
-app.get('/center/:centerId/*', (req, res) => { res.sendFile(path.join(frontendRoot, 'index.html')); });
+// SPA uchun: /center/:centerId — avval DB dan mavjudligini tekshiramiz
+async function serveCenterOrNotFound(req, res) {
+  try {
+    const { centerId } = req.params;
+    const result = await pool.query('SELECT id FROM centers WHERE id=$1 AND is_active=true', [centerId]);
+    if (!result.rows.length) {
+      return res.status(404).send(`
+        <!DOCTYPE html><html lang="uz"><head><meta charset="utf-8">
+        <title>Topilmadi</title>
+        <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc}
+        .box{text-align:center;padding:40px;background:#fff;border-radius:16px;box-shadow:0 4px 24px #0001}
+        h1{font-size:64px;margin:0;color:#6366f1}p{color:#64748b;font-size:18px}
+        a{display:inline-block;margin-top:16px;padding:10px 24px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none}</style>
+        </head><body><div class="box">
+        <h1>404</h1>
+        <p>Bu o'quv markaz mavjud emas yoki faol emas.</p>
+        <a href="/">Bosh sahifa</a>
+        </div></body></html>
+      `);
+    }
+    res.sendFile(path.join(frontendRoot, 'index.html'));
+  } catch(e) {
+    res.sendFile(path.join(frontendRoot, 'index.html'));
+  }
+}
+app.get('/center/:centerId', serveCenterOrNotFound);
+app.get('/center/:centerId/*', serveCenterOrNotFound);
 
 // ── DB Connection ─────────────────────────────────────────────────────────
 const pool = new Pool({
