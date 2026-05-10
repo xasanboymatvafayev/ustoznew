@@ -162,14 +162,17 @@ router.post('/login/admin', async (req, res) => {
   const { username, password, center_id } = req.body;
   const db = req.app.get('db');
   try {
-    // center_id majburiy - bo'lmasa xato
-    if (!center_id) {
+    // center_id ni har doim integer ga aylantiramiz
+    console.log('[admin-login] body:', { center_id, password: password ? '***' : 'EMPTY' });
+    const cid = parseInt(center_id);
+    console.log('[admin-login] cid parsed:', cid);
+    if (!cid) {
       return res.status(400).json({ error: "center_id ko'rsatilmagan" });
     }
 
     // Center mavjud va faolligini tekshiramiz
     const centerCheck = await db.query(
-      'SELECT id FROM centers WHERE id=$1 AND is_active=true', [center_id]
+      'SELECT id FROM centers WHERE id=$1 AND is_active=true', [cid]
     );
     if (!centerCheck.rows.length) {
       return res.status(404).json({ error: "Bu o'quv markaz mavjud emas yoki faol emas" });
@@ -178,7 +181,7 @@ router.post('/login/admin', async (req, res) => {
     // center_admins jadvalidan parolni olamiz
     const result = await db.query(
       'SELECT * FROM center_admins WHERE center_id=$1 AND is_active=true LIMIT 1',
-      [center_id]
+      [cid]
     );
     if (!result.rows.length) {
       return res.status(401).json({ error: "Admin paroli topilmadi" });
@@ -190,11 +193,11 @@ router.post('/login/admin', async (req, res) => {
     if (!valid) return res.status(401).json({ error: "Parol noto'g'ri" });
 
     const token = jwt.sign(
-      { id: admin.id, role: 'admin', center_id: Number(center_id) },
+      { id: admin.id, role: 'admin', center_id: cid },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
-    res.json({ token, role: 'admin', center_id: Number(center_id) });
+    res.json({ token, role: 'admin', center_id: cid });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
