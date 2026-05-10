@@ -299,6 +299,23 @@ app.get('/api/center-info/:centerId', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// 🆕 Public: center guruhlarini olish (ro'yxatdan o'tish uchun, auth kerak emas)
+app.get('/api/center-info/:centerId/groups', async (req, res) => {
+  try {
+    const cid = parseInt(req.params.centerId);
+    if (!cid) return res.status(400).json({ error: 'Invalid ID' });
+    const result = await pool.query(`
+      SELECT g.id, g.name, g.subject, g.lesson_days, g.lesson_time,
+             m.full_name as mentor_name
+      FROM groups g
+      LEFT JOIN mentors m ON g.mentor_id = m.id
+      WHERE g.center_id = $1 AND g.is_active = true
+      ORDER BY g.name ASC
+    `, [cid]);
+    res.json({ groups: result.rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.use('/api/auth',        require('./routes/auth'));
 app.use('/api/admin',       require('./routes/admin'));
 app.use('/api/mentor',      require('./routes/mentor'));
