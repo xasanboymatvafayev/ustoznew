@@ -76,14 +76,32 @@ const initDB = async () => {
   try {
     await pool.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
-    // Admins jadvaliga multitenant ustunlarini qo'shish (migration)
+    // Migration: multitenant ustunlarini qo'shish
     await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS login VARCHAR(100)`);
     await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS center_id INTEGER REFERENCES centers(id)`);
     await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS full_name VARCHAR(200)`);
     await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`);
-    // login bo'sh bo'lsa username bilan to'ldiramiz
     await pool.query(`UPDATE admins SET login=username WHERE login IS NULL`);
     await pool.query(`UPDATE admins SET is_active=true WHERE is_active IS NULL`);
+
+    // users, mentors, groups ga center_id qo'shish
+    await pool.query(`ALTER TABLE users    ADD COLUMN IF NOT EXISTS center_id INTEGER REFERENCES centers(id)`);
+    await pool.query(`ALTER TABLE mentors  ADD COLUMN IF NOT EXISTS center_id INTEGER REFERENCES centers(id)`);
+    await pool.query(`ALTER TABLE groups   ADD COLUMN IF NOT EXISTS center_id INTEGER REFERENCES centers(id)`);
+
+    // Guruhga qo'shilish so'rovlari jadvali
+    await pool.query(`CREATE TABLE IF NOT EXISTS group_join_requests (
+      id          SERIAL PRIMARY KEY,
+      group_id    UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+      user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      center_id   INTEGER REFERENCES centers(id),
+      status      VARCHAR(20) DEFAULT 'pending',
+      created_at  TIMESTAMP DEFAULT NOW(),
+      UNIQUE(group_id, user_id)
+    )`);
+
+    // Public center info uchun endpoint (auth.js da ishlatiladi)
+    // Center nomi frontendga beriladi
 
     // Asosiy jadvallar (oldingi kod)
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
@@ -268,6 +286,19 @@ pool.connect((err) => {
 app.set('db', pool);
 
 // ── ROUTES ────────────────────────────────────────────────────────────────
+// Public: center info (auth kerak emas)
+app.get('/api/center-info/:centerId', async (req, res) => {
+  try {
+    const cid = parseInt(req.params.centerId);
+    if (!cid) return res.status(400).json({ error: 'Invalid ID' });
+    const result = await pool.query(
+      'SELECT id, name, city, admin_name FROM centers WHERE id=$1 AND is_active=true', [cid]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Markaz topilmadi' });
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.use('/api/auth',        require('./routes/auth'));
 app.use('/api/admin',       require('./routes/admin'));
 app.use('/api/mentor',      require('./routes/mentor'));
