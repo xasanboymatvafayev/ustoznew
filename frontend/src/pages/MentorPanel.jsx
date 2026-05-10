@@ -40,6 +40,7 @@ Reply ONLY in this format (use Uzbek language):
 const Sidebar = ({ active, setActive, logout, mentor }) => {
   const items = [
     { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+    { id: 'requests', icon: '🔔', label: "So'rovlar" },
     { id: 'groups', icon: '🏫', label: 'Guruhlar' },
     { id: 'students', icon: '🎓', label: "O'quvchilar" },
     { id: 'profile', icon: '👤', label: 'Profil' },
@@ -96,6 +97,7 @@ export default function MentorPanel() {
       <Sidebar active={active} setActive={(a) => { setActive(a); setSelectedGroup(null); }} logout={handleLogout} mentor={user} />
       <main className="main-content">
         {active === 'dashboard' && <MentorDashboard data={data} />}
+        {active === 'requests' && <JoinRequests />}
         {active === 'groups' && !selectedGroup && (
           <MentorGroups groups={data?.groups || []} onSelect={setSelectedGroup} />
         )}
@@ -1418,3 +1420,66 @@ function MentorStudents({ groups }) {
     </div>
   );
 }
+
+// ── Guruhga qo'shilish so'rovlari ─────────────────────────────────
+function JoinRequests() {
+  const [requests, setRequests] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState('');
+
+  const load = () => {
+    setLoading(true);
+    API.get('/mentor/join-requests')
+      .then(r => { setRequests(r.data); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  React.useEffect(() => { load(); }, []);
+
+  const handle = async (id, action) => {
+    try {
+      await API.put(`/mentor/join-requests/${id}/${action}`);
+      setMsg(action === 'approve' ? '✅ Tasdiqlandi!' : '❌ Rad etildi');
+      load();
+      setTimeout(() => setMsg(''), 3000);
+    } catch(e) {
+      setMsg('Xatolik: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
+  if (loading) return <div style={{padding:32,textAlign:'center'}}>Yuklanmoqda...</div>;
+
+  return (
+    <div style={{padding:24}}>
+      <h2 style={{marginBottom:16}}>🔔 Guruhga qo'shilish so'rovlari</h2>
+      {msg && <div style={{padding:'10px 16px',borderRadius:8,background:'var(--surface2)',marginBottom:16}}>{msg}</div>}
+      {!requests.length ? (
+        <div style={{textAlign:'center',color:'var(--text3)',padding:48}}>Hozircha so'rov yo'q</div>
+      ) : requests.map(r => (
+        <div key={r.id} style={{
+          background:'var(--card)',border:'1px solid var(--border)',
+          borderRadius:12,padding:16,marginBottom:12,
+          display:'flex',justifyContent:'space-between',alignItems:'center',gap:12
+        }}>
+          <div>
+            <div style={{fontWeight:600}}>{r.full_name}</div>
+            <div style={{fontSize:13,color:'var(--text2)'}}>{r.email} · {r.phone}</div>
+            <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Guruh: <b>{r.group_name}</b></div>
+          </div>
+          <div style={{display:'flex',gap:8,flexShrink:0}}>
+            <button onClick={() => handle(r.id,'approve')}
+              style={{padding:'8px 16px',borderRadius:8,border:'none',background:'#22c55e',color:'#fff',cursor:'pointer',fontWeight:600}}>
+              ✅ Qabul
+            </button>
+            <button onClick={() => handle(r.id,'reject')}
+              style={{padding:'8px 16px',borderRadius:8,border:'none',background:'#ef4444',color:'#fff',cursor:'pointer',fontWeight:600}}>
+              ❌ Rad
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default MentorPanel;
