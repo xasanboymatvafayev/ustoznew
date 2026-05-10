@@ -14,18 +14,25 @@ const genCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 // REGISTER — Step 1: validate, save, return code
 // ─────────────────────────────────────────────
 router.post('/register/send-code', async (req, res) => {
-  const { login, full_name, phone, email, group_name, password } = req.body;
+  const { login, full_name, phone, email, group_name, password, center_id } = req.body;
   const db = req.app.get('db');
 
   try {
-    const existing = await db.query('SELECT id, is_verified FROM users WHERE email = $1', [email]);
+    const cid = parseInt(center_id);
+    if (!cid) return res.status(400).json({ error: 'center_id kerak' });
+
+    const existing = await db.query('SELECT id, is_verified FROM users WHERE email=$1 AND center_id=$2', [email, cid]);
     if (existing.rows.length > 0 && existing.rows[0].is_verified) {
-      return res.status(409).json({ error: 'Bu email bilan avval ro\'yxatdan o\'tilgan', exists: true });
+      return res.status(409).json({ error: "Bu email bilan avval ro'yxatdan o'tilgan", exists: true });
     }
 
-    const groupExists = await db.query('SELECT name FROM groups WHERE name = $1', [group_name]);
+    // Guruhni faqat shu center dan qidirish
+    const groupExists = await db.query(
+      'SELECT id, name, mentor_id FROM groups WHERE name=$1 AND center_id=$2 AND is_active=true',
+      [group_name, cid]
+    );
     if (!groupExists.rows.length) {
-      return res.status(400).json({ error: 'Bu guruh topilmadi' });
+      return res.status(400).json({ error: 'Bu guruh topilmadi yoki bu markazga tegishli emas' });
     }
 
     const code = genCode();
@@ -33,14 +40,13 @@ router.post('/register/send-code', async (req, res) => {
     const hash = await bcrypt.hash(password, 8);
 
     await db.query(`
-      INSERT INTO users (login, full_name, phone, email, group_name, password_hash, verification_code, verification_expires)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      INSERT INTO users (login, full_name, phone, email, group_name, password_hash, verification_code, verification_expires, center_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       ON CONFLICT (email) DO UPDATE SET
         login=$1, full_name=$2, phone=$3, group_name=$5,
-        password_hash=$6, verification_code=$7, verification_expires=$8, is_verified=false
-    `, [login, full_name, phone, email, group_name, hash, code, expires]);
+        password_hash=$6, verification_code=$7, verification_expires=$8, is_verified=false, center_id=$9
+    `, [login, full_name, phone, email, group_name, hash, code, expires, cid]);
 
-    // ✅ Kodni frontendga qaytaramiz — frontend EmailJS orqali yuboradi
     res.json({ message: 'Kod tayyor', email, code });
   } catch (e) {
     console.error(e);
@@ -67,16 +73,29 @@ router.post('/register/verify', async (req, res) => {
     const u = result.rows[0];
     await db.query('UPDATE users SET is_verified=true, verification_code=null WHERE email=$1', [email]);
 
-    const group = await db.query('SELECT id FROM groups WHERE name=$1', [u.group_name]);
+    // Guruhga to'g'ridan emas - mentor tasdiqlashi kerak
+    const group = await db.query(
+      'SELECT id FROM groups WHERE name=$1 AND center_id=$2 AND is_active=true',
+      [u.group_name, u.center_id]
+    );
     if (group.rows.length) {
-      await db.query(
-        'INSERT INTO group_members (group_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-        [group.rows[0].id, u.id]
-      );
+      // So'rov yaratamiz - mentor tasdiqlaydi
+      await db.query(`
+        INSERT INTO group_join_requests (group_id, user_id, center_id, status)
+        VALUES ($1, $2, $3, 'pending')
+        ON CONFLICT (group_id, user_id) DO UPDATE SET status='pending'
+      `, [group.rows[0].id, u.id, u.center_id]);
     }
 
-    const token = jwt.sign({ id: u.id, role: 'student', email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: u.id, full_name: u.full_name, email, role: 'student' } });
+    const token = jwt.sign(
+      { id: u.id, role: 'student', email, center_id: u.center_id },
+      JWT_SECRET, { expiresIn: '7d' }
+    );
+    res.json({
+      token,
+      user: { id: u.id, full_name: u.full_name, email, role: 'student', center_id: u.center_id },
+      message: "Ro'yxatdan o'tdingiz! Mentor tasdiqlashini kuting."
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
