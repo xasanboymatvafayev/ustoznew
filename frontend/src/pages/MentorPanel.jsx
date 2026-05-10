@@ -1481,5 +1481,3 @@ function JoinRequests() {
     </div>
   );
 }
-
-export default MentorPanel;
