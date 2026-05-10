@@ -48,6 +48,7 @@ export default function LoginPage() {
   const [showAdminKey, setShowAdminKey] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [centerName, setCenterName] = useState('');
+  const [centerGroups, setCenterGroups] = useState([]); // 🆕 Markaz guruhlari
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -79,13 +80,17 @@ export default function LoginPage() {
   const err  = (msg) => { setError(msg);   setLoading(false); };
   const succ = (msg) => { setSuccess(msg); setLoading(false); };
 
-  // Center nomini URL dan olamiz
+  // Center nomini va guruhlarini URL dan olamiz
   useEffect(() => {
     const pathCenterId = window.location.pathname.split('/center/')[1]?.split('/')[0];
     if (pathCenterId) {
       axios.get(`/api/center-info/${pathCenterId}`)
         .then(r => setCenterName(r.data.name))
         .catch(() => setCenterName(''));
+      // 🆕 Shu markazning guruhlarini olamiz (ro'yxatdan o'tish uchun)
+      axios.get(`/api/center-info/${pathCenterId}/groups`)
+        .then(r => setCenterGroups(r.data.groups || []))
+        .catch(() => setCenterGroups([]));
     }
   }, []);
 
@@ -107,9 +112,13 @@ export default function LoginPage() {
   const handleMentorLogin = async (e) => {
     e.preventDefault(); setLoading(true); clearMessages();
     try {
-      const res = await API.post('/auth/login/mentor', { phone: mentorPhone, password: mentorPass });
+      const pathCenterId = window.location.pathname.split('/center/')[1]?.split('/')[0];
+      const center_id = pathCenterId || localStorage.getItem('center_id');
+      const res = await API.post('/auth/login/mentor', { phone: mentorPhone, password: mentorPass, center_id });
       login(res.data.token, { ...res.data.mentor, role: 'mentor' });
-      navigate('/mentor');
+      // center_id bo'lsa, center path ga yo'naltir
+      const mentorCenterId = res.data.mentor?.center_id || center_id;
+      navigate(mentorCenterId ? `/center/${mentorCenterId}/mentor` : '/mentor');
     } catch (e) { err(e.response?.data?.error || 'Telefon yoki parol noto\'g\'ri'); }
   };
 
@@ -117,9 +126,13 @@ export default function LoginPage() {
   const handleStudentLogin = async (e) => {
     e.preventDefault(); setLoading(true); clearMessages();
     try {
-      const res = await API.post('/auth/login/student', { email: stuEmail, password: stuPass });
+      const pathCenterId = window.location.pathname.split('/center/')[1]?.split('/')[0];
+      const center_id = pathCenterId || localStorage.getItem('center_id');
+      const res = await API.post('/auth/login/student', { email: stuEmail, password: stuPass, center_id });
       login(res.data.token, { ...res.data.user, role: 'student' });
-      navigate('/student');
+      // center_id bo'lsa, center path ga yo'naltir
+      const studentCenterId = res.data.user?.center_id || center_id;
+      navigate(studentCenterId ? `/center/${studentCenterId}/student` : '/student');
     } catch (e) { err(e.response?.data?.error || 'Email yoki parol noto\'g\'ri'); }
   };
 
@@ -167,7 +180,8 @@ export default function LoginPage() {
         code:  regCode,
       });
       login(res.data.token, { ...res.data.user, role: 'student' });
-      navigate('/student');
+      const studentCenterId = res.data.user?.center_id;
+      navigate(studentCenterId ? `/center/${studentCenterId}/student` : '/student');
     } catch (e) { err(e.response?.data?.error || 'Kod noto\'g\'ri yoki muddati o\'tgan'); }
   };
 
@@ -394,9 +408,23 @@ export default function LoginPage() {
                       value={regData.email} onChange={e => setRegData({ ...regData, email: e.target.value })} required />
                   </div>
                   <div className="form-group">
-                    <label>🏫 Guruh nomi</label>
-                    <input className="input" placeholder="G-01, Python-2024 ..."
-                      value={regData.group_name} onChange={e => setRegData({ ...regData, group_name: e.target.value })} required />
+                    <label>🏫 Guruh</label>
+                    {centerGroups.length > 0 ? (
+                      <select className="input"
+                        value={regData.group_name}
+                        onChange={e => setRegData({ ...regData, group_name: e.target.value })}
+                        required>
+                        <option value="">-- Guruhni tanlang --</option>
+                        {centerGroups.map(g => (
+                          <option key={g.id} value={g.name}>
+                            {g.name}{g.mentor_name ? ` — ${g.mentor_name}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input className="input" placeholder="G-01, Python-2024 ..."
+                        value={regData.group_name} onChange={e => setRegData({ ...regData, group_name: e.target.value })} required />
+                    )}
                   </div>
                   <div className="form-group">
                     <label>🔒 Parol</label>
