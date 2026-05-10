@@ -172,7 +172,9 @@ router.post('/login/admin', async (req, res) => {
     if (!result.rows.length) return res.status(401).json({ error: "Login yoki parol noto'g'ri" });
 
     const admin = result.rows[0];
-    const valid = await bcrypt.compare(password, admin.password_hash);
+    if (!password) return res.status(400).json({ error: 'Parol kiritilmagan' });
+    if (!admin.password_hash) return res.status(500).json({ error: 'Admin paroli sozlanmagan' });
+    const valid = await bcrypt.compare(String(password), admin.password_hash);
     if (!valid) return res.status(401).json({ error: "Parol noto'g'ri" });
 
     const token = jwt.sign(
