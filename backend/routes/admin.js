@@ -372,4 +372,75 @@ router.put('/join-requests/:id', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
+// GET /api/admin/my-center — Markaz va paket ma'lumotlari
+// ─────────────────────────────────────────────
+router.get('/my-center', async (req, res) => {
+  const db = req.app.get('db');
+  const cid = req.user.center_id;
+  try {
+    const result = await db.query(`
+      SELECT c.*, p.key as package_key, p.name as package_name,
+             p.price, p.max_groups, p.max_mentors, p.max_students
+      FROM centers c
+      JOIN packages p ON c.package_id = p.id
+      WHERE c.id = $1
+    `, [cid]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Markaz topilmadi' });
+
+    // Joriy foydalanish
+    const usage = await db.query(`
+      SELECT
+        (SELECT COUNT(*) FROM groups WHERE center_id=$1 AND is_active=true) as groups_count,
+        (SELECT COUNT(*) FROM mentors WHERE center_id=$1 AND is_active=true) as mentors_count,
+        (SELECT COUNT(*) FROM users WHERE center_id=$1 AND is_verified=true) as students_count
+    `, [cid]);
+
+    // Barcha paketlar
+    const packages = await db.query('SELECT * FROM packages ORDER BY price ASC');
+
+    res.json({
+      center: result.rows[0],
+      usage: usage.rows[0],
+      packages: packages.rows
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/admin/change-package — Paketni o'zgartirish so'rovi
+// ─────────────────────────────────────────────
+router.post('/change-package', async (req, res) => {
+  const db = req.app.get('db');
+  const cid = req.user.center_id;
+  const { package_key } = req.body;
+  try {
+    if (!package_key) return res.status(400).json({ error: 'package_key kerak' });
+
+    const pkg = await db.query('SELECT * FROM packages WHERE key=$1', [package_key]);
+    if (!pkg.rows.length) return res.status(404).json({ error: 'Paket topilmadi' });
+
+    await db.query(
+      'UPDATE centers SET package_id=$1 WHERE id=$2',
+      [pkg.rows[0].id, cid]
+    );
+
+    // Agar to'lovli paket bo'lsa, to'lov yozuvi yaratamiz
+    if (pkg.rows[0].price > 0) {
+      const month = new Date().toISOString().slice(0, 7);
+      await db.query(`
+        INSERT INTO center_payments (center_id, month, amount, status, created_at)
+        VALUES ($1, $2, $3, 'pending', NOW())
+        ON CONFLICT (center_id, month) DO NOTHING
+      `, [cid, month, pkg.rows[0].price]);
+    }
+
+    res.json({ success: true, message: `Paket ${pkg.rows[0].name} ga o'zgartirildi` });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
