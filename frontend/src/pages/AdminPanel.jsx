@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import API from '../utils/api';
@@ -567,7 +567,9 @@ function AdminPackages({ data, reload }) {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [confirmKey, setConfirmKey] = useState('');
-  const [payModal, setPayModal] = useState(null); // { pay_url, package_name, amount }
+  const [payModal, setPayModal] = useState(null); // { pay_url, package_name, amount, order_id }
+  const [payStatus, setPayStatus] = useState('pending'); // 'pending' | 'paid' | 'cancelled'
+  const pollingRef = useRef(null);
 
   if (!data) return <div className="loading"><div className="spinner" /></div>;
 
@@ -583,6 +585,43 @@ function AdminPackages({ data, reload }) {
 
   const limitLabel = (val) => val === -1 ? 'Cheksiz' : val;
 
+  // Polling: har 10 soniyada to'lov statusini tekshirish
+  const startPolling = (orderId) => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      try {
+        const r = await API.get(`/payments/check/${orderId}`);
+        const status = r.data.status;
+        if (status === 'paid') {
+          setPayStatus('paid');
+          stopPolling();
+          // 2 soniyadan so'ng modal yopiladi va sahifa yangilanadi
+          setTimeout(() => {
+            setPayModal(null);
+            setPayStatus('pending');
+            reload();
+          }, 2000);
+        } else if (status === 'cancelled' || status === 'cancel') {
+          setPayStatus('cancelled');
+          stopPolling();
+          setTimeout(() => {
+            setPayModal(null);
+            setPayStatus('pending');
+          }, 2000);
+        }
+      } catch (e) {
+        console.error('Polling error:', e);
+      }
+    }, 10000);
+  };
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
   const handleChangePackage = async () => {
     const selPkg = packages.find(p => p.key === selectedKey);
     if (!confirmKey || confirmKey !== selPkg?.name) return;
@@ -597,8 +636,11 @@ function AdminPackages({ data, reload }) {
           amount:       r.data.amount,
           order_id:     r.data.order_id,
         });
+        setPayStatus('pending');
         setSelectedKey('');
         setConfirmKey('');
+        // Polling boshlash
+        startPolling(r.data.order_id);
       } else {
         // Bepul paket — darhol faollashtirish
         setMsg(r.data.message);
@@ -613,8 +655,11 @@ function AdminPackages({ data, reload }) {
   };
 
   const handlePayModalClose = () => {
+    stopPolling();
     setPayModal(null);
-    reload(); // To'lov holati yangilanishi uchun
+    setPayStatus('pending');
+    // X bosilganda RELOAD qilmaymiz — foydalanuvchi to'lamagan bo'lishi mumkin
+    // Lekin agar to'lov pending bo'lsa, sahifani yangilash shart emas
   };
 
   const currentPkg = packages.find(p => p.key === center.package_key);
@@ -655,20 +700,47 @@ function AdminPackages({ data, reload }) {
                 }}
               >✕</button>
             </div>
-            {/* iframe */}
-            <iframe
-              src={payModal.pay_url}
-              title="To'lov"
-              style={{ width: '100%', height: '500px', border: 'none' }}
-              allow="payment"
-            />
+
+            {/* To'lov status overlay */}
+            {payStatus === 'paid' ? (
+              <div style={{
+                height: '200px', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: '12px',
+              }}>
+                <div style={{ fontSize: '48px' }}>✅</div>
+                <div style={{ fontWeight: 700, fontSize: '18px', color: '#2e7d32' }}>To'lov muvaffaqiyatli!</div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Markaz faollashtirilmoqda...</div>
+              </div>
+            ) : payStatus === 'cancelled' ? (
+              <div style={{
+                height: '200px', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: '12px',
+              }}>
+                <div style={{ fontSize: '48px' }}>❌</div>
+                <div style={{ fontWeight: 700, fontSize: '18px', color: '#c62828' }}>To'lov bekor qilindi</div>
+              </div>
+            ) : (
+              /* iframe */
+              <iframe
+                src={payModal.pay_url}
+                title="To'lov"
+                style={{ width: '100%', height: '500px', border: 'none' }}
+                allow="payment"
+              />
+            )}
+
             {/* Footer hint */}
             <div style={{
               padding: '12px 20px', background: 'var(--bg2)',
-              borderTop: '1px solid var(--border)', fontSize: '12px', color: 'var(--text3)',
+              borderTop: '1px solid var(--border)', fontSize: '12px',
               textAlign: 'center',
+              color: payStatus === 'paid' ? '#2e7d32' : payStatus === 'cancelled' ? '#c62828' : 'var(--text3)',
             }}>
-              To'lovni amalga oshirgach markaz avtomatik faollashadi. Oynani yopish uchun ✕ bosing.
+              {payStatus === 'paid'
+                ? '✅ To\'lov qabul qilindi! Sahifa yangilanmoqda...'
+                : payStatus === 'cancelled'
+                ? '❌ To\'lov bekor qilindi. Oynani yopishingiz mumkin.'
+                : '🔄 To\'lov holati har 10 soniyada tekshiriladi. To\'lovni amalga oshirgach markaz avtomatik faollashadi.'}
             </div>
           </div>
         </div>
