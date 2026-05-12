@@ -418,7 +418,7 @@ router.post('/change-package', async (req, res) => {
   const { package_key } = req.body;
   const fetch = require('node-fetch');
 
-  const TOLOV_BASE = process.env.TOLOV_API_URL || 'https://tolovavto.up.railway.app/api';
+  const TOLOV_BASE = process.env.TOLOV_API_URL || 'https://qulayhamyon.up.railway.app/api';
   const SHOP_ID    = process.env.TOLOV_SHOP_ID;
   const SHOP_KEY   = process.env.TOLOV_SHOP_KEY;
 
