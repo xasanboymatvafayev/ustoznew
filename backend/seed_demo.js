@@ -6,7 +6,7 @@
  *  1. Toshkent IT Academy (free)
  *  2. Samarqand Edu Center (pro)
  *  3. Namangan Smart School (pro)
- *  4. Buxoro Digital Hub (unlimited)
+ *  4. Buxoro Digital Hub (unlimited
  */
 
 require('dotenv').config();
