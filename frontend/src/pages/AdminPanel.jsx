@@ -53,10 +53,18 @@ export default function AdminPanel() {
   const [packageData, setPackageData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState(null);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = () => {
+    const centerId = user?.center_id || localStorage.getItem('center_id');
+    logout();
+    if (centerId) {
+      navigate(`/center/${centerId}/login`);
+    } else {
+      navigate('/login');
+    }
+  };
 
   useEffect(() => { loadData(); }, [active]);
 
@@ -559,6 +567,7 @@ function AdminPackages({ data, reload }) {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [confirmKey, setConfirmKey] = useState('');
+  const [payModal, setPayModal] = useState(null); // { pay_url, package_name, amount }
 
   if (!data) return <div className="loading"><div className="spinner" /></div>;
 
@@ -575,25 +584,96 @@ function AdminPackages({ data, reload }) {
   const limitLabel = (val) => val === -1 ? 'Cheksiz' : val;
 
   const handleChangePackage = async () => {
-    const pkgName = packages.find(p => p.key === selectedKey)?.name;
-    if (!confirmKey || confirmKey !== pkgName) return;
+    const selPkg = packages.find(p => p.key === selectedKey);
+    if (!confirmKey || confirmKey !== selPkg?.name) return;
     setChanging(true); setMsg(''); setErr('');
     try {
       const r = await API.post('/admin/change-package', { package_key: selectedKey });
-      setMsg(r.data.message);
-      setSelectedKey('');
-      setConfirmKey('');
-      reload();
+      if (r.data.pay_url) {
+        // To'lovli paket — modal oynada to'lov sahifasini ochish
+        setPayModal({
+          pay_url:      r.data.pay_url,
+          package_name: r.data.package,
+          amount:       r.data.amount,
+          order_id:     r.data.order_id,
+        });
+        setSelectedKey('');
+        setConfirmKey('');
+      } else {
+        // Bepul paket — darhol faollashtirish
+        setMsg(r.data.message);
+        setSelectedKey('');
+        setConfirmKey('');
+        reload();
+      }
     } catch (e) {
       setErr(e.response?.data?.error || 'Xatolik yuz berdi');
     }
     setChanging(false);
   };
 
+  const handlePayModalClose = () => {
+    setPayModal(null);
+    reload(); // To'lov holati yangilanishi uchun
+  };
+
   const currentPkg = packages.find(p => p.key === center.package_key);
 
   return (
     <div className="fade-in">
+      {/* To'lov modali */}
+      {payModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          zIndex: 9999, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', padding: '16px',
+        }}>
+          <div style={{
+            background: 'var(--bg)', borderRadius: '16px', width: '100%',
+            maxWidth: '600px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Modal header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '16px 20px', borderBottom: '1px solid var(--border)',
+              background: 'var(--bg2)',
+            }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '16px' }}>
+                  💳 {payModal.package_name} paketi uchun to'lov
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '2px' }}>
+                  Summa: <b style={{ color: 'var(--accent)' }}>{payModal.amount?.toLocaleString()} so'm</b>
+                </div>
+              </div>
+              <button
+                onClick={handlePayModalClose}
+                style={{
+                  background: 'none', border: 'none', fontSize: '22px',
+                  cursor: 'pointer', color: 'var(--text3)', padding: '4px 8px',
+                }}
+              >✕</button>
+            </div>
+            {/* iframe */}
+            <iframe
+              src={payModal.pay_url}
+              title="To'lov"
+              style={{ width: '100%', height: '500px', border: 'none' }}
+              allow="payment"
+            />
+            {/* Footer hint */}
+            <div style={{
+              padding: '12px 20px', background: 'var(--bg2)',
+              borderTop: '1px solid var(--border)', fontSize: '12px', color: 'var(--text3)',
+              textAlign: 'center',
+            }}>
+              To'lovni amalga oshirgach markaz avtomatik faollashadi. Oynani yopish uchun ✕ bosing.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <h2>📦 Paketlar</h2>
         <p>Joriy obuna holati va paketni o'zgartirish</p>
