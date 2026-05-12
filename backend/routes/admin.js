@@ -410,35 +410,86 @@ router.get('/my-center', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// POST /api/admin/change-package — Paketni o'zgartirish so'rovi
+// POST /api/admin/change-package — Paketni o'zgartirish va to'lov URL olish
 // ─────────────────────────────────────────────
 router.post('/change-package', async (req, res) => {
   const db = req.app.get('db');
   const cid = req.user.center_id;
   const { package_key } = req.body;
+  const fetch = require('node-fetch');
+
+  const TOLOV_BASE = process.env.TOLOV_API_URL || 'https://tolovavto.up.railway.app/api';
+  const SHOP_ID    = process.env.TOLOV_SHOP_ID;
+  const SHOP_KEY   = process.env.TOLOV_SHOP_KEY;
+
   try {
     if (!package_key) return res.status(400).json({ error: 'package_key kerak' });
 
     const pkg = await db.query('SELECT * FROM packages WHERE key=$1', [package_key]);
     if (!pkg.rows.length) return res.status(404).json({ error: 'Paket topilmadi' });
 
-    await db.query(
-      'UPDATE centers SET package_id=$1 WHERE id=$2',
-      [pkg.rows[0].id, cid]
-    );
+    const newPkg = pkg.rows[0];
 
-    // Agar to'lovli paket bo'lsa, to'lov yozuvi yaratamiz
-    if (pkg.rows[0].price > 0) {
-      const month = new Date().toISOString().slice(0, 7);
-      await db.query(`
-        INSERT INTO center_payments (center_id, month, amount, status, created_at)
-        VALUES ($1, $2, $3, 'pending', NOW())
-        ON CONFLICT (center_id, month) DO NOTHING
-      `, [cid, month, pkg.rows[0].price]);
+    // Paketni o'zgartir
+    await db.query('UPDATE centers SET package_id=$1 WHERE id=$2', [newPkg.id, cid]);
+
+    // Agar bepul paket bo'lsa — to'lovsiz faollashtir
+    if (newPkg.price <= 0) {
+      await db.query('UPDATE centers SET is_active=true WHERE id=$1', [cid]);
+      return res.json({ success: true, message: `Paket ${newPkg.name} ga o'zgartirildi`, pay_url: null });
     }
 
-    res.json({ success: true, message: `Paket ${pkg.rows[0].name} ga o'zgartirildi` });
+    // To'lovli paket — to'lov URL olish
+    if (!SHOP_ID || !SHOP_KEY) {
+      return res.status(500).json({ error: 'To\'lovchi.uz API kalitlari sozlanmagan' });
+    }
+
+    const month = new Date().toISOString().slice(0, 7);
+
+    // Avvalgi pending to'lovni o'chirish
+    await db.query(
+      `DELETE FROM center_payments WHERE center_id=$1 AND month=$2 AND status='pending'`,
+      [cid, month]
+    );
+
+    // Markaz faol bo'lmagan holatda qoldirish (to'lov amalga oshmagunicha)
+    await db.query('UPDATE centers SET is_active=false WHERE id=$1', [cid]);
+
+    // To'lovchi.uz dan URL olish
+    const url = new URL(TOLOV_BASE);
+    url.searchParams.set('method', 'create');
+    url.searchParams.set('shop_id', SHOP_ID);
+    url.searchParams.set('shop_key', SHOP_KEY);
+    url.searchParams.set('amount', newPkg.price);
+    url.searchParams.set('payurl', 'true');
+
+    const tolovRes = await fetch(url.toString());
+    if (!tolovRes.ok) throw new Error(`To\'lovchi.uz HTTP ${tolovRes.status}`);
+    const data = await tolovRes.json();
+
+    if (data.status !== 'success') {
+      return res.status(400).json({ error: data.message || 'To\'lov yaratishda xatolik' });
+    }
+
+    const pay_url = data.pay_url || data.url || null;
+
+    // DBga to'lov yozuvi saqlash
+    await db.query(
+      `INSERT INTO center_payments (center_id, month, amount, order_id, status, pay_url, created_at)
+       VALUES ($1, $2, $3, $4, 'pending', $5, NOW())`,
+      [cid, month, newPkg.price, data.order, pay_url]
+    );
+
+    res.json({
+      success:  true,
+      message:  `${newPkg.name} paketiga o'tish uchun to'lov zarur`,
+      pay_url,
+      order_id: data.order,
+      amount:   newPkg.price,
+      package:  newPkg.name,
+    });
   } catch (e) {
+    console.error('change-package error:', e);
     res.status(500).json({ error: e.message });
   }
 });
