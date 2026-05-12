@@ -57,7 +57,15 @@ export default function StudentPanel() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = () => {
+    const centerId = user?.center_id || localStorage.getItem('center_id');
+    logout();
+    if (centerId) {
+      navigate(`/center/${centerId}/login`);
+    } else {
+      navigate('/login');
+    }
+  };
 
   useEffect(() => {
     API.get('/student/dashboard').then(r => setDashboard(r.data)).catch(console.error);
