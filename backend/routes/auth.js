@@ -42,7 +42,7 @@ router.post('/register/send-code', async (req, res) => {
     await db.query(`
       INSERT INTO users (login, full_name, phone, email, group_name, password_hash, verification_code, verification_expires, center_id)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      ON CONFLICT (email) DO UPDATE SET
+      ON CONFLICT (email, center_id) DO UPDATE SET
         login=$1, full_name=$2, phone=$3, group_name=$5,
         password_hash=$6, verification_code=$7, verification_expires=$8, is_verified=false, center_id=$9
     `, [login, full_name, phone, email, group_name, hash, code, expires, cid]);
