@@ -1,16 +1,20 @@
-/**
- * Demo markazlar yaratish skripti
- * Ishga tushurish:
- * node seed_demo.js
- */
-
 require('dotenv').config();
 
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
+// =====================
+// SAFETY FIX (MUHIM)
+// =====================
+if (!process.env.DATABASE_URL) {
+  throw new Error('❌ DATABASE_URL topilmadi (.env ni tekshir)');
+}
+
+// =====================
+// DB CONNECTION FIX
+// =====================
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: String(process.env.DATABASE_URL),
   ssl:
     process.env.NODE_ENV === 'production'
       ? { rejectUnauthorized: false }
@@ -183,7 +187,6 @@ async function seed() {
 
     await client.query('BEGIN');
 
-    // Paketlarni olish
     const packagesResult = await client.query(`
       SELECT *
       FROM packages
@@ -191,23 +194,19 @@ async function seed() {
     `);
 
     if (!packagesResult.rows.length) {
-      throw new Error(
-        '❌ Paketlar topilmadi! Avval packages tablega data qo‘shing.'
-      );
+      throw new Error('❌ Paketlar topilmadi!');
     }
 
     console.log(
       '📦 Paketlar:',
-      packagesResult.rows
-        .map((p) => `${p.name} (${p.key})`)
-        .join(', ')
+      packagesResult.rows.map(p => `${p.name} (${p.key})`).join(', ')
     );
 
     console.log('');
 
     for (const c of centers) {
       const pkg = packagesResult.rows.find(
-        (p) => p.key === c.package_key
+        p => p.key === c.package_key
       );
 
       if (!pkg) {
@@ -217,44 +216,23 @@ async function seed() {
 
       let centerId;
 
-      // Markaz mavjudmi?
       const existingCenter = await client.query(
-        `
-        SELECT id
-        FROM centers
-        WHERE name = $1
-      `,
+        `SELECT id FROM centers WHERE name = $1`,
         [c.name]
       );
 
       if (existingCenter.rows.length) {
         centerId = existingCenter.rows[0].id;
 
-        console.log(
-          `⏭️ ${c.name} mavjud → yangilanmoqda`
-        );
+        console.log(`⏭️ ${c.name} mavjud → yangilanmoqda`);
 
         await client.query(
-          `
-          UPDATE centers
-          SET
-            city = $1,
-            admin_name = $2,
-            phone = $3,
-            package_id = $4,
-            is_active = true
-          WHERE id = $5
-        `,
-          [
-            c.city,
-            c.admin_name,
-            c.phone,
-            pkg.id,
-            centerId,
-          ]
+          `UPDATE centers
+           SET city=$1, admin_name=$2, phone=$3, package_id=$4, is_active=true
+           WHERE id=$5`,
+          [c.city, c.admin_name, c.phone, pkg.id, centerId]
         );
       } else {
-        // Yangi center
         const trialEnds =
           c.package_key === 'free'
             ? null
@@ -266,23 +244,13 @@ async function seed() {
             : new Date(Date.now() + 31 * 86400000);
 
         const centerResult = await client.query(
-          `
-          INSERT INTO centers (
-            name,
-            city,
-            admin_name,
-            phone,
-            package_id,
-            is_active,
-            trial_ends_at,
-            subscription_until,
-            created_at
+          `INSERT INTO centers (
+            name, city, admin_name, phone,
+            package_id, is_active,
+            trial_ends_at, subscription_until, created_at
           )
-          VALUES (
-            $1,$2,$3,$4,$5,true,$6,$7,NOW()
-          )
-          RETURNING id
-        `,
+          VALUES ($1,$2,$3,$4,$5,true,$6,$7,NOW())
+          RETURNING id`,
           [
             c.name,
             c.city,
@@ -296,101 +264,59 @@ async function seed() {
 
         centerId = centerResult.rows[0].id;
 
-        console.log(
-          `✅ ${c.name} yaratildi → ID: ${centerId}`
-        );
+        console.log(`✅ ${c.name} yaratildi → ID: ${centerId}`);
       }
 
-      // Admin yaratish
-      const adminHash = await bcrypt.hash(
-        c.admin_password,
-        10
-      );
+      // ADMIN
+      const adminHash = await bcrypt.hash(c.admin_password, 10);
 
       await client.query(
-        `
-        INSERT INTO center_admins (
-          center_id,
-          full_name,
-          password_hash,
-          is_active
+        `INSERT INTO center_admins (
+          center_id, full_name, password_hash, is_active
         )
         VALUES ($1,$2,$3,true)
-
         ON CONFLICT (center_id)
         DO UPDATE SET
           full_name = EXCLUDED.full_name,
           password_hash = EXCLUDED.password_hash,
-          is_active = true
-      `,
-        [
-          centerId,
-          c.admin_name,
-          adminHash,
-        ]
+          is_active = true`,
+        [centerId, c.admin_name, adminHash]
       );
 
-      // Mentorlar
+      console.log(`🔑 ADMIN PAROL: ${c.admin_password}`);
+
+      // MENTORS
       for (const mentor of c.mentors) {
-        const mentorHash = await bcrypt.hash(
-          mentor.password,
-          10
-        );
+        const mentorHash = await bcrypt.hash(mentor.password, 10);
 
         await client.query(
-          `
-          INSERT INTO mentors (
-            full_name,
-            phone,
-            password_hash,
-            is_active,
-            center_id
+          `INSERT INTO mentors (
+            full_name, phone, password_hash, is_active, center_id
           )
           VALUES ($1,$2,$3,true,$4)
-
-          ON CONFLICT (phone)
-          DO NOTHING
-        `,
-          [
-            mentor.full_name,
-            mentor.phone,
-            mentorHash,
-            centerId,
-          ]
+          ON CONFLICT (phone) DO NOTHING`,
+          [mentor.full_name, mentor.phone, mentorHash, centerId]
         );
 
         console.log(
-          `   👨‍🏫 Mentor: ${mentor.full_name}`
+          `   👨‍🏫 Mentor: ${mentor.full_name} | PAROL: ${mentor.password}`
         );
       }
 
-      // Guruhlar
+      // GROUPS
       for (const g of c.groups) {
         const existingGroup = await client.query(
-          `
-          SELECT id
-          FROM study_groups
-          WHERE name = $1
-          AND center_id = $2
-        `,
+          `SELECT id FROM study_groups
+           WHERE name=$1 AND center_id=$2`,
           [g.name, centerId]
         );
 
         if (!existingGroup.rows.length) {
           await client.query(
-            `
-            INSERT INTO study_groups (
-              name,
-              subject,
-              lesson_days,
-              lesson_time,
-              is_active,
-              center_id
+            `INSERT INTO study_groups (
+              name, subject, lesson_days, lesson_time, is_active, center_id
             )
-            VALUES (
-              $1,$2,$3,$4,true,$5
-            )
-          `,
+            VALUES ($1,$2,$3,$4,true,$5)`,
             [
               g.name,
               g.subject,
@@ -400,13 +326,7 @@ async function seed() {
             ]
           );
 
-          console.log(
-            `   🏫 Guruh: ${g.name}`
-          );
-        } else {
-          console.log(
-            `   ⏭️ Guruh mavjud: ${g.name}`
-          );
+          console.log(`   🏫 Guruh: ${g.name}`);
         }
       }
 
@@ -414,34 +334,13 @@ async function seed() {
         process.env.BASE_URL ||
         'https://ustoz.up.railway.app';
 
-      console.log(
-        `   🔗 URL: ${baseUrl}/center/${centerId}`
-      );
-
-      console.log(
-        `   🔑 Admin parol: ${c.admin_password}`
-      );
-
-      console.log('');
+      console.log(`🔗 URL: ${baseUrl}/center/${centerId}`);
+      console.log('--------------------------\n');
     }
 
     await client.query('COMMIT');
 
-    console.log('✅ Barcha demo markazlar tayyor!\n');
-
-    const allCenters = await client.query(`
-      SELECT id, name, city
-      FROM centers
-      ORDER BY id
-    `);
-
-    console.log('📊 Markazlar:\n');
-
-    allCenters.rows.forEach((c) => {
-      console.log(
-        `${c.id} → ${c.name} (${c.city})`
-      );
-    });
+    console.log('🎉 BARCHA MARKAZLAR TAYYOR!');
   } catch (error) {
     await client.query('ROLLBACK');
 
