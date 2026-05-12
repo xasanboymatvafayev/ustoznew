@@ -106,10 +106,10 @@ const initDB = async () => {
     // Asosiy jadvallar (oldingi kod)
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      login VARCHAR(100) UNIQUE NOT NULL,
+      login VARCHAR(100) NOT NULL,
       full_name VARCHAR(200) NOT NULL,
       phone VARCHAR(20),
-      email VARCHAR(200) UNIQUE NOT NULL,
+      email VARCHAR(200) NOT NULL,
       group_name VARCHAR(100),
       password_hash VARCHAR(255) NOT NULL,
       is_verified BOOLEAN DEFAULT FALSE,
@@ -118,16 +118,45 @@ const initDB = async () => {
       center_id INTEGER,
       created_at TIMESTAMP DEFAULT NOW()
     )`);
+    // Multitenant: email va login faqat bir markaz ichida unique bo'lsin
+    await pool.query(`
+      DO $$ BEGIN
+        -- Eski global unique indexlarni o'chirish
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='users_email_key') THEN
+          ALTER TABLE users DROP CONSTRAINT users_email_key;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='users_login_key') THEN
+          ALTER TABLE users DROP CONSTRAINT users_login_key;
+        END IF;
+      END $$;
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS users_email_center_unique ON users(email, center_id);
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS users_login_center_unique ON users(login, center_id);
+    `);
 
     await pool.query(`CREATE TABLE IF NOT EXISTS mentors (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       full_name VARCHAR(200) NOT NULL,
-      phone VARCHAR(20) UNIQUE NOT NULL,
+      phone VARCHAR(20) NOT NULL,
       password_hash VARCHAR(255) NOT NULL,
       is_active BOOLEAN DEFAULT TRUE,
       center_id INTEGER,
       created_at TIMESTAMP DEFAULT NOW()
     )`);
+    // Mentor phone faqat bir markaz ichida unique bo'lsin
+    await pool.query(`
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='mentors_phone_key') THEN
+          ALTER TABLE mentors DROP CONSTRAINT mentors_phone_key;
+        END IF;
+      END $$;
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS mentors_phone_center_unique ON mentors(phone, center_id);
+    `);
 
     await pool.query(`CREATE TABLE IF NOT EXISTS groups (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -249,10 +278,13 @@ const initDB = async () => {
       amount      INTEGER NOT NULL,
       order_id    VARCHAR(100),
       status      VARCHAR(20) DEFAULT 'pending',
+      pay_url     TEXT,
       created_at  TIMESTAMP DEFAULT NOW(),
       paid_at     TIMESTAMP,
       UNIQUE(center_id, month)
     )`);
+    // Eski jadvalga pay_url ustuni qo'shish (agar mavjud bo'lmasa)
+    await pool.query(`ALTER TABLE center_payments ADD COLUMN IF NOT EXISTS pay_url TEXT`);
 
     // Center adminlari - har bir markaz uchun alohida
     await pool.query(`CREATE TABLE IF NOT EXISTS center_admins (
@@ -344,5 +376,29 @@ app.listen(PORT, () => {
   console.log(`🛡️  Boss Admin: http://localhost:${PORT}/superadmin`);
   console.log(`🏢  O'quv markaz: http://localhost:${PORT}/center/1001`);
 });
+
+// ── Obuna muddati tekshirish (har 6 soatda) ─────────────────────────────
+async function checkSubscriptionExpiry() {
+  try {
+    // subscription_until o'tgan va hali faol markazlarni o'chirish
+    const result = await pool.query(`
+      UPDATE centers
+      SET is_active = false
+      WHERE is_active = true
+        AND subscription_until IS NOT NULL
+        AND subscription_until < NOW()
+      RETURNING id, name
+    `);
+    if (result.rows.length > 0) {
+      console.log(`⏰ Obuna tugadi, o'chirildi: ${result.rows.map(r => r.name).join(', ')}`);
+    }
+  } catch (e) {
+    console.error('Subscription expiry check error:', e);
+  }
+}
+
+// Darhol bir marta ishga tushir, keyin har 6 soatda
+checkSubscriptionExpiry();
+setInterval(checkSubscriptionExpiry, 6 * 60 * 60 * 1000);
 
 module.exports = app;
