@@ -13,7 +13,7 @@
 const router = require('express').Router();
 const fetch = require('node-fetch'); // npm install node-fetch@2
 
-const TOLOV_BASE = process.env.TOLOV_API_URL || 'https://tolovavto.up.railway.app/api';
+const TOLOV_BASE = process.env.TOLOV_API_URL || 'https://qulayhamyon.up.railway.app/api';
 const SHOP_ID    = process.env.TOLOV_SHOP_ID;
 const SHOP_KEY   = process.env.TOLOV_SHOP_KEY;
 
@@ -118,7 +118,7 @@ router.post('/create', async (req, res) => {
 
       // Markaz faollashtirish
       await db.query(
-        `UPDATE centers SET is_active=true, subscription_until=DATE_TRUNC('month', NOW()) + INTERVAL '1 month' - INTERVAL '1 day'
+        `UPDATE centers SET is_active=true, subscription_until=NOW() + INTERVAL '31 days'
          WHERE id=$1`,
         [center_id]
       );
@@ -143,6 +143,7 @@ router.post('/create', async (req, res) => {
       shop_id:  SHOP_ID,
       shop_key: SHOP_KEY,
       amount:   finalAmount,
+      payurl:   'true',
     });
 
     if (data.status !== 'success') {
@@ -152,10 +153,10 @@ router.post('/create', async (req, res) => {
     // DBga saqlash
     const payRes = await db.query(
       `INSERT INTO center_payments
-         (center_id, month, amount, order_id, status, created_at)
-       VALUES ($1, $2, $3, $4, 'pending', NOW())
+         (center_id, month, amount, order_id, status, pay_url, created_at)
+       VALUES ($1, $2, $3, $4, 'pending', $5, NOW())
        RETURNING *`,
-      [center_id, month, finalAmount, data.order]
+      [center_id, month, finalAmount, data.order, data.pay_url || data.url || null]
     );
 
     // Promokod band qilish (ishlatildi lekin hali to'lanmagan)
@@ -168,9 +169,10 @@ router.post('/create', async (req, res) => {
     }
 
     res.json({
-      success:  true,
-      order_id: data.order,
-      amount:   finalAmount,
+      success:   true,
+      order_id:  data.order,
+      amount:    finalAmount,
+      pay_url:   data.pay_url || data.url || null,
       original_amount: center.price,
       promo_applied: promoInfo ? {
         code:     promoInfo.code,
@@ -219,7 +221,7 @@ router.get('/check/:orderId', async (req, res) => {
           [orderId]
         );
         await db.query(
-          `UPDATE centers SET is_active=true, subscription_until=DATE_TRUNC('month', NOW()) + INTERVAL '1 month' - INTERVAL '1 day'
+          `UPDATE centers SET is_active=true, subscription_until=NOW() + INTERVAL '31 days'
            WHERE id=$1`,
           [pay.center_id]
         );
