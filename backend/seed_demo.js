@@ -3,24 +3,28 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-// =====================
-// SAFETY FIX (MUHIM)
-// =====================
+// =========================
+// SAFETY FIX (TO‘LIQ)
+// =========================
 if (!process.env.DATABASE_URL) {
-  throw new Error('❌ DATABASE_URL topilmadi (.env ni tekshir)');
+  throw new Error('❌ DATABASE_URL topilmadi (Railway Variables ni tekshir)');
 }
 
-// =====================
-// DB CONNECTION FIX
-// =====================
+console.log('📡 DATABASE_URL TYPE:', typeof process.env.DATABASE_URL);
+
+// =========================
+// DB CONNECTION (FIXED)
+// =========================
 const pool = new Pool({
-  connectionString: String(process.env.DATABASE_URL),
-  ssl:
-    process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : false,
+  connectionString: String(process.env.DATABASE_URL).trim(),
+  ssl: {
+    rejectUnauthorized: false, // Railway 100% kerak
+  },
 });
 
+// =========================
+// DATA (HECH NARSA O‘ZGARMAGAN)
+// =========================
 const centers = [
   {
     name: 'Toshkent IT Academy',
@@ -179,6 +183,9 @@ const centers = [
   },
 ];
 
+// =========================
+// SEED FUNCTION
+// =========================
 async function seed() {
   const client = await pool.connect();
 
@@ -224,7 +231,7 @@ async function seed() {
       if (existingCenter.rows.length) {
         centerId = existingCenter.rows[0].id;
 
-        console.log(`⏭️ ${c.name} mavjud → yangilanmoqda`);
+        console.log(`♻️ ${c.name} → yangilanmoqda`);
 
         await client.query(
           `UPDATE centers
@@ -264,7 +271,7 @@ async function seed() {
 
         centerId = centerResult.rows[0].id;
 
-        console.log(`✅ ${c.name} yaratildi → ID: ${centerId}`);
+        console.log(`✅ CREATED: ${c.name} → ${centerId}`);
       }
 
       // ADMIN
@@ -276,66 +283,45 @@ async function seed() {
         )
         VALUES ($1,$2,$3,true)
         ON CONFLICT (center_id)
-        DO UPDATE SET
-          full_name = EXCLUDED.full_name,
-          password_hash = EXCLUDED.password_hash,
-          is_active = true`,
+        DO UPDATE SET password_hash=EXCLUDED.password_hash`,
         [centerId, c.admin_name, adminHash]
       );
 
       console.log(`🔑 ADMIN PAROL: ${c.admin_password}`);
 
       // MENTORS
-      for (const mentor of c.mentors) {
-        const mentorHash = await bcrypt.hash(mentor.password, 10);
+      for (const m of c.mentors) {
+        const hash = await bcrypt.hash(m.password, 10);
 
         await client.query(
           `INSERT INTO mentors (
-            full_name, phone, password_hash, is_active, center_id
+            full_name, phone, password_hash, center_id, is_active
           )
-          VALUES ($1,$2,$3,true,$4)
+          VALUES ($1,$2,$3,$4,true)
           ON CONFLICT (phone) DO NOTHING`,
-          [mentor.full_name, mentor.phone, mentorHash, centerId]
+          [m.full_name, m.phone, hash, centerId]
         );
 
-        console.log(
-          `   👨‍🏫 Mentor: ${mentor.full_name} | PAROL: ${mentor.password}`
-        );
+        console.log(`👨‍🏫 ${m.full_name} | PAROL: ${m.password}`);
       }
 
       // GROUPS
       for (const g of c.groups) {
-        const existingGroup = await client.query(
-          `SELECT id FROM study_groups
-           WHERE name=$1 AND center_id=$2`,
-          [g.name, centerId]
+        await client.query(
+          `INSERT INTO study_groups (
+            name, subject, lesson_days, lesson_time, center_id, is_active
+          )
+          VALUES ($1,$2,$3,$4,$5,true)
+          ON CONFLICT DO NOTHING`,
+          [g.name, g.subject, g.lesson_days, g.lesson_time, centerId]
         );
-
-        if (!existingGroup.rows.length) {
-          await client.query(
-            `INSERT INTO study_groups (
-              name, subject, lesson_days, lesson_time, is_active, center_id
-            )
-            VALUES ($1,$2,$3,$4,true,$5)`,
-            [
-              g.name,
-              g.subject,
-              g.lesson_days,
-              g.lesson_time,
-              centerId,
-            ]
-          );
-
-          console.log(`   🏫 Guruh: ${g.name}`);
-        }
       }
 
       const baseUrl =
         process.env.BASE_URL ||
         'https://ustoz.up.railway.app';
 
-      console.log(`🔗 URL: ${baseUrl}/center/${centerId}`);
-      console.log('--------------------------\n');
+      console.log(`🔗 URL: ${baseUrl}/center/${centerId}\n`);
     }
 
     await client.query('COMMIT');
