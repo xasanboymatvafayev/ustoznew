@@ -286,6 +286,12 @@ const initDB = async () => {
     // Eski jadvalga pay_url ustuni qo'shish (agar mavjud bo'lmasa)
     await pool.query(`ALTER TABLE center_payments ADD COLUMN IF NOT EXISTS pay_url TEXT`);
 
+    // assignments jadvaliga classwork uchun kerakli ustunlar qo'shish
+    await pool.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS classwork_type VARCHAR(20) DEFAULT 'code'`);
+    await pool.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS correct_answer TEXT`);
+    await pool.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS max_score INTEGER DEFAULT 10`);
+    await pool.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS started_at TIMESTAMP`);
+
     // Center adminlari - har bir markaz uchun alohida
     await pool.query(`CREATE TABLE IF NOT EXISTS center_admins (
       id            SERIAL PRIMARY KEY,
