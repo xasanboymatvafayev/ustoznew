@@ -626,41 +626,53 @@ function AdminPackages({ data, reload }) {
     }
   };
 
-  const handleChangePackage = async () => {
+ const handleChangePackage = async () => {
     const selPkg = packages.find(p => p.key === selectedKey);
     if (!confirmKey || confirmKey !== selPkg?.name) return;
-    setChanging(true); setMsg(''); setErr('');
+    
+    setChanging(true); 
+    setMsg(''); 
+    setErr('');
+    
     try {
-      const r = await API.post('/admin/change-package', { package_key: selectedKey });
-      if (r.data.pay_url) {
-        // To'lovli paket — yangi oynada ochish
-        setPayModal({
-          pay_url:      r.data.pay_url,
-          package_name: r.data.package,
-          amount:       r.data.amount,
-          order_id:     r.data.order_id,
-        });
-        setPayStatus('pending');
-        setSelectedKey('');
-        setConfirmKey('');
+        const r = await API.post('/admin/change-package', { package_key: selectedKey });
         
-        // Yangi oynada ochish (iframe o'rniga)
-        paymentWindowRef.current = window.open(r.data.pay_url, '_blank', 'width=800,height=600,resizable=yes,scrollbars=yes');
-        
-        // Polling boshlash
-        startPolling(r.data.order_id);
-      } else {
-        // Bepul paket — darhol faollashtirish
-        setMsg(r.data.message);
-        setSelectedKey('');
-        setConfirmKey('');
-        reload();
-      }
+        if (r.data.pay_url) {
+            setPayModal({
+                pay_url: r.data.pay_url,
+                package_name: r.data.package,
+                amount: r.data.amount,
+                order_id: r.data.order_id,
+            });
+            setPayStatus('pending');
+            setSelectedKey('');
+            setConfirmKey('');
+            
+            // ⭐ POP-UP BLOCK TEKSHIRISH
+            const newWindow = window.open(r.data.pay_url, '_blank', 'width=800,height=600,resizable=yes,scrollbars=yes');
+            
+            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                // Pop-up bloklangan
+                alert("⚠️ To'lov oynasi ochilmadi!\n\nBrauzeringiz pop-up blokirovkasini o'chiring yoki quyidagi linkni bosing:\n\n" + r.data.pay_url);
+                // Linkni modalda ko'rsatish
+                setErr(`⚠️ To'lov oynasi ochilmadi. Iltimos, brauzer sozlamalaridan pop-up blokirovkasini o'chiring yoki quyidagi linkni bosing: ${r.data.pay_url}`);
+            } else {
+                paymentWindowRef.current = newWindow;
+                startPolling(r.data.order_id);
+            }
+        } else {
+            setMsg(r.data.message);
+            setSelectedKey('');
+            setConfirmKey('');
+            reload();
+        }
     } catch (e) {
-      setErr(e.response?.data?.error || 'Xatolik yuz berdi');
+        setErr(e.response?.data?.error || 'Xatolik yuz berdi');
+        setSelectedKey('');
+        setConfirmKey('');
     }
     setChanging(false);
-  };
+};
 
   const handlePayModalClose = () => {
     stopPolling();
@@ -738,6 +750,15 @@ function AdminPackages({ data, reload }) {
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '16px' }}>
                     To'lovni yakunlang. To'lov holati avtomatik tekshiriladi.
+                  </div>
+                  {/* LINK QO'SHISH */}
+                  <div style={{ marginTop: '16px', padding: '12px', background: '#e3f2fd', borderRadius: '8px' }}>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '13px' }}>
+                      🔗 Agar oyna ochilmasa, quyidagi linkni bosing:
+                    </p>
+                    <a href={payModal.pay_url} target="_blank" rel="noopener noreferrer" style={{ color: '#1565c0', wordBreak: 'break-all', fontSize: '12px' }}>
+                        {payModal.pay_url}
+                    </a>
                   </div>
                   <div style={{ 
                     fontSize: '12px', 
