@@ -124,7 +124,7 @@ router.get('/groups/:id/schedule', async (req, res) => {
     );
     const assignments = await db.query(
       `SELECT a.*,
-        json_agg(json_build_object('user_id',s.user_id,'score',s.score,'submitted_at',s.submitted_at,'id',s.id,'content',s.content,'mentor_feedback',s.mentor_feedback)) as submissions
+        json_agg(json_build_object('user_id',s.user_id,'score',s.score,'submitted_at',s.submitted_at,'id',s.id,'content',s.content,'mentor_feedback',s.mentor_feedback)) FILTER (WHERE s.id IS NOT NULL) as submissions
        FROM assignments a
        LEFT JOIN submissions s ON a.id=s.assignment_id
        WHERE a.group_id=$1 AND a.lesson_date IS NOT NULL
@@ -365,19 +365,84 @@ router.post('/assignments/:id/grade-all', async (req, res) => {
   try {
     // FIX: assignment shu mentorning guruhiga tegishli ekanligini tekshirish
     const aCheck = await db.query(
-      `SELECT a.id FROM assignments a
+      `SELECT a.* FROM assignments a
        JOIN groups g ON a.group_id=g.id
        WHERE a.id=$1 AND g.mentor_id=$2 AND g.center_id=$3`,
       [req.params.id, req.user.id, cid]
     );
     if (!aCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
 
+    const assignment = aCheck.rows[0];
+
     const subs = await db.query(
       `SELECT s.*, u.full_name FROM submissions s JOIN users u ON s.user_id=u.id
        WHERE s.assignment_id=$1 AND (s.score IS NULL OR s.score=0)`,
       [req.params.id]
     );
-    res.json({ count: subs.rows.length, submissions: subs.rows });
+    // max_score ni ham qaytaramiz — frontend AI'ga shu ballgacha baho berishni aytadi
+    res.json({ count: subs.rows.length, submissions: subs.rows, max_score: assignment.max_score || 10 });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Uy vazifasi bajarmagan o'quvchilarga avto 0 qo'yish
+// (keyingi dars boshlanganida mentor bosadi)
+// ─────────────────────────────────────────────
+router.post('/assignments/:id/auto-zero', async (req, res) => {
+  const db = req.app.get('db');
+  const cid = req.user.center_id;
+  try {
+    const aCheck = await db.query(
+      `SELECT a.* FROM assignments a
+       JOIN groups g ON a.group_id=g.id
+       WHERE a.id=$1 AND g.mentor_id=$2 AND g.center_id=$3`,
+      [req.params.id, req.user.id, cid]
+    );
+    if (!aCheck.rows.length) return res.status(403).json({ error: "Ruxsat yo'q" });
+
+    const assignment = aCheck.rows[0];
+    const lessonDate = assignment.lesson_date || assignment.due_date;
+
+    // Guruh a'zolari
+    const members = await db.query(
+      `SELECT user_id FROM group_members WHERE group_id=$1`,
+      [assignment.group_id]
+    );
+
+    // Vazifa yuborganlar
+    const submitted = await db.query(
+      `SELECT user_id FROM submissions WHERE assignment_id=$1`,
+      [req.params.id]
+    );
+    const submittedIds = new Set(submitted.rows.map(r => r.user_id));
+
+    // Yubormaganlar — 0 ball
+    let zeroCount = 0;
+    for (const m of members.rows) {
+      if (!submittedIds.has(m.user_id)) {
+        // submissions jadvaliga 0 qo'shamiz
+        await db.query(
+          `INSERT INTO submissions (assignment_id, user_id, content, score, mentor_feedback)
+           VALUES ($1,$2,'','0','⛔ Vazifa topshirilmadi')
+           ON CONFLICT (assignment_id, user_id) DO NOTHING`,
+          [req.params.id, m.user_id]
+        );
+        // scores jadvaliga ham 0
+        if (lessonDate) {
+          await db.query(
+            `INSERT INTO scores (user_id, group_id, assignment_id, score, lesson_date)
+             VALUES ($1,$2,$3,0,$4)
+             ON CONFLICT (user_id, group_id, lesson_date)
+             DO UPDATE SET score=0, assignment_id=$3, updated_at=NOW()`,
+            [m.user_id, assignment.group_id, req.params.id, lessonDate]
+          );
+        }
+        zeroCount++;
+      }
+    }
+    res.json({ message: `${zeroCount} ta o'quvchiga 0 ball qo'yildi`, zero_count: zeroCount });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
