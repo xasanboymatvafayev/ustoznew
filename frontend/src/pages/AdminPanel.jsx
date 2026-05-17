@@ -103,7 +103,7 @@ export default function AdminPanel() {
             {active === 'groups' && <AdminGroups groups={groups} mentors={mentors} reload={loadData} />}
             {active === 'students' && <AdminStudents students={students} reload={loadData} />}
             {active === 'calendar' && <AdminCalendar groups={groups} />}
-            {active === 'packages' && < data={packageData} reload={loadData} />}
+            {active === 'packages' && <AdminPackages data={packageData} reload={loadData} />}
           </>
         )}
       </main>
