@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import API from '../utils/api';
 
-const GROQ_KEY = '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';
+const GROQ_KEY = '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';
 
 const geminiCheck = async (assignmentTitle, studentAnswer, maxScore = 10) => {
   if (!GROQ_KEY) throw new Error('Groq API key sozlanmagan.');
@@ -129,7 +129,7 @@ function MentorDashboard({ data }) {
         <div className="stat-card">
           <div style={{ fontSize: '28px' }}>🎓</div>
           <div className="stat-value" style={{ color: 'var(--accent)' }}>{data.total_students}</div>
-          <div className="stat-label">Jami o'quvchilar</div>
+          <div className="stat-label">Jami o&#39;quvchilar</div>
         </div>
         <div className="stat-card">
           <div style={{ fontSize: '28px' }}>🏫</div>
@@ -354,11 +354,11 @@ function HomeworkView({ group }) {
     <div className="fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h3 style={{ fontFamily: 'var(--font2)' }}>📋 Uy vazifalari</h3>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Vazifa qo'shish</button>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Vazifa qo&#39;shish</button>
       </div>
 
       {assignments.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>📋 Hali uy vazifalari yo'q</div>
+        <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>📋 Hali uy vazifalari yo&#39;q</div>
       )}
 
       {assignments.map(a => (
@@ -380,7 +380,7 @@ function HomeworkView({ group }) {
               </button>
               <button className="btn btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}
                 onClick={() => handleAutoZero(a)} disabled={autoZeroLoading[a.id]}>
-                {autoZeroLoading[a.id] ? '...' : '⛔ 0 qo'y'}
+                {autoZeroLoading[a.id] ? '...' : "⛔ 0 qo'y"}
               </button>
               <button className="btn btn-danger btn-sm" onClick={() => handleDeleteHomework(a.id)}>🗑️</button>
             </div>
@@ -397,7 +397,7 @@ function HomeworkView({ group }) {
                   </button>
                 )}
               </div>
-              {subs.length === 0 && <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Hali javob yo'q</p>}
+              {subs.length === 0 && <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Hali javob yo&#39;q</p>}
               {subs.map(s => (
                 <div key={s.id} style={{ background: 'var(--bg2)', borderRadius: '10px', padding: '14px', marginBottom: '10px', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -456,7 +456,7 @@ function HomeworkView({ group }) {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="modal-title">📋 Uy vazifasi qo'shish</span>
+              <span className="modal-title">📋 Uy vazifasi qo&#39;shish</span>
               <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
             </div>
             <form onSubmit={handleAdd}>
@@ -467,7 +467,7 @@ function HomeworkView({ group }) {
                 <textarea className="input" rows={4} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={{ resize: 'vertical' }} />
               </div>
               <div className="form-group">
-                <label>📅 Qaysi dars sanasiga? (faqat o'tgan va bugungi sanalar)</label>
+                <label>📅 Qaysi dars sanasiga? (faqat o&#39;tgan va bugungi sanalar)</label>
                 {validDates.length === 0 ? (
                   <p style={{ color: 'var(--danger)', fontSize: '13px' }}>⚠️ Guruhda jadval sanasi kiritilmagan</p>
                 ) : (
@@ -481,7 +481,7 @@ function HomeworkView({ group }) {
                   </select>
                 )}
                 <small style={{ color: 'var(--text3)', fontSize: '11px' }}>
-                  ⚠️ Kelajak sanaga vazifa qo'shib bo'lmaydi. Bir sanaga faqat 1 ta uy vazifasi.
+                  ⚠️ Kelajak sanaga vazifa qo&#39;shib bo&#39;lmaydi. Bir sanaga faqat 1 ta uy vazifasi.
                 </small>
               </div>
               <div className="form-group">
@@ -701,7 +701,7 @@ function ClassworkView({ group }) {
                 </div>
               )}
 
-              {subs.length === 0 && <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Hali javob yo'q</p>}
+              {subs.length === 0 && <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Hali javob yo&#39;q</p>}
               {subs.map(s => (
                 <div key={s.id} style={{ background: 'var(--bg2)', borderRadius: '10px', padding: '12px', marginBottom: '8px', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
@@ -827,7 +827,7 @@ function ClassworkView({ group }) {
               {cwType === 'iq' && (
                 <>
                   <div className="form-group">
-                    <label>✅ To'g'ri javob</label>
+                    <label>✅ To&#39;g&#39;ri javob</label>
                     <input className="input" value={form.correct_answer}
                       onChange={e => setForm({ ...form, correct_answer: e.target.value })}
                       placeholder="Masalan: 2 yoki Python yoki A" required />
@@ -1027,7 +1027,7 @@ function ScheduleView({ group }) {
           ) : (
             <button className="btn btn-primary btn-sm" onClick={() => setEditMode(true)}>✏️ Tahrirlash</button>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowAddTable(!showAddTable)}>📅 Jadval qo'shish</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowAddTable(!showAddTable)}>📅 Jadval qo&#39;shish</button>
           <button className="btn btn-danger btn-sm" onClick={handleClear} disabled={clearing}>
             {clearing ? '...' : '🗑️ Tozalash'}
           </button>
@@ -1094,7 +1094,7 @@ function ScheduleView({ group }) {
                           <span
                             className="tag tag-green"
                             style={{ fontSize: '10px', cursor: 'pointer', position: 'relative' }}
-                            title="Javobni ko'rish / o'chirish"
+                            title="Javobni ko&#39;rish / o&#39;chirish"
                             onClick={() => setShowAnswerModal({ sub, assignment: a, member: m })}
                           >✅ {sub.score > 0 ? sub.score : ''}</span>
                         ) : (
@@ -1191,7 +1191,7 @@ function AddTableDate({ group, onClose }) {
     try {
       // Guruh start_date va end_date ni yangilash orqali jadval qo'shiladi
       await API.put(`/mentor/groups/${group.id}/dates`, { start_date: startDate, end_date: endDate });
-      setMsg(`✅ Jadval qo'shildi! ${preview?.length || 0} ta dars kuni.`);
+      setMsg(`✅ Jadval qo&#39;shildi! ${preview?.length || 0} ta dars kuni.`);
       setTimeout(onClose, 1500);
     } catch (e) {
       setMsg('❌ Xatolik: ' + (e.response?.data?.error || e.message));
@@ -1204,7 +1204,7 @@ function AddTableDate({ group, onClose }) {
 
   return (
     <div className="card" style={{ marginBottom: '16px', border: '1px solid var(--accent)', background: 'rgba(91,141,238,0.05)' }}>
-      <h4 style={{ marginBottom: '12px', color: 'var(--accent)' }}>📅 Jadval sanasini qo'shish</h4>
+      <h4 style={{ marginBottom: '12px', color: 'var(--accent)' }}>📅 Jadval sanasini qo&#39;shish</h4>
       <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '12px' }}>
         Guruh turi: <b style={{ color: 'var(--text)' }}>{lessonTypeLabel}</b>
       </div>
@@ -1387,7 +1387,7 @@ function AttendanceView({ group }) {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>#</th><th>O'quvchi</th><th style={{ textAlign: 'center' }}>✅ Keldi</th><th style={{ textAlign: 'center' }}>❌ Kelmadi</th><th style={{ textAlign: 'center' }}>% Davomat</th></tr>
+              <tr><th>#</th><th>O&#39;quvchi</th><th style={{ textAlign: 'center' }}>✅ Keldi</th><th style={{ textAlign: 'center' }}>❌ Kelmadi</th><th style={{ textAlign: 'center' }}>% Davomat</th></tr>
             </thead>
             <tbody>
               {members.map((m, idx) => {
@@ -1462,7 +1462,7 @@ function MentorProfile() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="card">
-            <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>Ma'lumotlar</h3>
+            <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>Ma&#39;lumotlar</h3>
             {[{ label: 'Ism Familya', value: user?.full_name, icon: '👤' }, { label: 'Telefon', value: user?.phone, icon: '📱' }].map((item, i) => (
               <div key={i} style={{ padding: '12px', background: 'var(--bg2)', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '10px' }}>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>{item.icon} {item.label}</div>
@@ -1471,7 +1471,7 @@ function MentorProfile() {
             ))}
           </div>
           <div className="card">
-            <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>🔒 Parol o'zgartirish</h3>
+            <h3 style={{ fontFamily: 'var(--font2)', marginBottom: '16px' }}>🔒 Parol o&#39;zgartirish</h3>
             {msg && <div className="alert alert-success">{msg}</div>}
             {error && <div className="alert alert-error">{error}</div>}
             <form onSubmit={handlePassword}>
@@ -1515,7 +1515,7 @@ function MentorStudents({ groups }) {
 
   return (
     <div className="fade-in">
-      <div className="page-header"><h2>O'quvchilar</h2></div>
+      <div className="page-header"><h2>O&#39;quvchilar</h2></div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {groups.map(g => (
           <button key={g.id} className={`btn ${selGroup === g.id ? 'btn-primary' : 'btn-secondary'}`}
@@ -1574,10 +1574,10 @@ function JoinRequests() {
 
   return (
     <div style={{padding:24}}>
-      <h2 style={{marginBottom:16}}>🔔 Guruhga qo'shilish so'rovlari</h2>
+      <h2 style={{marginBottom:16}}>🔔 Guruhga qo&#39;shilish so&#39;rovlari</h2>
       {msg && <div style={{padding:'10px 16px',borderRadius:8,background:'var(--surface2)',marginBottom:16}}>{msg}</div>}
       {!requests.length ? (
-        <div style={{textAlign:'center',color:'var(--text3)',padding:48}}>Hozircha so'rov yo'q</div>
+        <div style={{textAlign:'center',color:'var(--text3)',padding:48}}>Hozircha so&#39;rov yo&#39;q</div>
       ) : requests.map(r => (
         <div key={r.id} style={{
           background:'var(--card)',border:'1px solid var(--border)',
