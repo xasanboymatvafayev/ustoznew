@@ -5,7 +5,7 @@ import API from '../utils/api';
 
 const GROQ_KEY = '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';
 
-const geminiCheck = async (assignmentTitle, studentAnswer) => {
+const geminiCheck = async (assignmentTitle, studentAnswer, maxScore = 10) => {
   if (!GROQ_KEY) throw new Error('Groq API key sozlanmagan.');
   const prompt = `You are a teacher. Grade the student answer for the given task.
 
@@ -13,16 +13,17 @@ Task given to student: "${assignmentTitle}"
 Student's answer: "${studentAnswer}"
 
 IMPORTANT: The student answer above is their FULL response. Judge it fairly.
-Example: if task is "5+5=?" and student answered "10", that is CORRECT, give 10/10.
+Max score for this task is ${maxScore} points.
+Example: if task is "5+5=?" and student answered "10", that is CORRECT, give full score.
 
-Scoring (out of 10):
-- Fully correct: 9-10
-- Mostly correct: 6-8  
-- Partially correct: 3-5
-- Wrong or missing: 0-2
+Scoring (out of ${maxScore}):
+- Fully correct: ${Math.round(maxScore * 0.9)}-${maxScore}
+- Mostly correct: ${Math.round(maxScore * 0.6)}-${Math.round(maxScore * 0.8)}
+- Partially correct: ${Math.round(maxScore * 0.3)}-${Math.round(maxScore * 0.5)}
+- Wrong or missing: 0-${Math.round(maxScore * 0.2)}
 
 Reply ONLY in this format (use Uzbek language):
-**Baho: [0-10]**
+**Baho: [0-${maxScore}]**
 **Xatolar:** [errors or "Xato yo'q"]
 **Yaxshi tomonlari:** [what was good]
 **Maslahat:** [advice]`;
@@ -209,18 +210,46 @@ function GroupDetail({ group, view, setView, onBack }) {
 }
 
 // ── HOMEWORK ──
+// Jadval sanalarini hisoblash (bugungi va o'tgan sanalar)
+function getValidHomeworkDates(group) {
+  const { lesson_days, start_date, end_date } = group || {};
+  if (!start_date || !end_date) return [];
+  const dates = [];
+  let d = new Date(start_date);
+  const endD = new Date(end_date);
+  const today = new Date().toISOString().slice(0, 10);
+  while (d <= endD) {
+    const day = d.getDay();
+    let ok = false;
+    if (lesson_days === 'juft') ok = [2, 4, 6].includes(day);
+    else if (lesson_days === 'toq') ok = [1, 3, 5].includes(day);
+    else ok = day !== 0;
+    const dateStr = d.toISOString().slice(0, 10);
+    if (ok && dateStr <= today) dates.push(dateStr);
+    d.setDate(d.getDate() + 1);
+  }
+  return dates.reverse(); // Eng yangi sana yuqorida
+}
+
 function HomeworkView({ group }) {
   const [assignments, setAssignments] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', due_date: '', due_time: '23:00' });
+  const [form, setForm] = useState({ title: '', description: '', lesson_date: '', max_score: 10 });
   const [saving, setSaving] = useState(false);
   const [showSubs, setShowSubs] = useState(null);
   const [subs, setSubs] = useState([]);
   const [aiLoading, setAiLoading] = useState({});
+  const [checkAllLoading, setCheckAllLoading] = useState({});
   const [manualGrade, setManualGrade] = useState({});
   const [showManual, setShowManual] = useState({});
+  const [autoZeroLoading, setAutoZeroLoading] = useState({});
 
   useEffect(() => { load(); }, []);
+
+  const validDates = getValidHomeworkDates(group);
+
+  // Qaysi sanalar allaqachon vazifa berilgan
+  const usedDates = new Set(assignments.map(a => a.lesson_date?.slice(0, 10)).filter(Boolean));
 
   const load = async () => {
     const r = await API.get(`/assignments/group/${group.id}`);
@@ -229,9 +258,21 @@ function HomeworkView({ group }) {
 
   const handleAdd = async (e) => {
     e.preventDefault(); setSaving(true);
-    await API.post('/assignments', { ...form, group_id: group.id });
-    setShowModal(false); setForm({ title: '', description: '', due_date: '', due_time: '23:00' });
-    load(); setSaving(false);
+    try {
+      await API.post('/assignments', {
+        group_id: group.id,
+        title: form.title,
+        description: form.description,
+        lesson_date: form.lesson_date,
+        max_score: parseInt(form.max_score) || 10,
+      });
+      setShowModal(false);
+      setForm({ title: '', description: '', lesson_date: '', max_score: 10 });
+      load();
+    } catch (err) {
+      alert('❌ ' + (err.response?.data?.error || err.message));
+    }
+    setSaving(false);
   };
 
   const loadSubs = async (aId) => {
@@ -240,43 +281,84 @@ function HomeworkView({ group }) {
     setSubs(r.data);
   };
 
-  const handleAiCheck = async (s, assignmentTitle) => {
+  // AI tekshirish — max_score bilan
+  const handleAiCheck = async (s, assignment) => {
     setAiLoading(p => ({ ...p, [s.id]: true }));
     try {
-      const feedback = await geminiCheck(assignmentTitle, s.content);
+      const maxScore = assignment.max_score || 10;
+      const feedback = await geminiCheck(
+        assignment.title + (assignment.description ? ': ' + assignment.description : ''),
+        s.content,
+        maxScore
+      );
       const scoreMatch = feedback.match(/Baho:\s*(\d+)/);
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+      const score = scoreMatch ? Math.min(parseInt(scoreMatch[1]), maxScore) : 0;
       await API.put(`/mentor/submissions/${s.id}/grade`, { score, mentor_feedback: feedback });
       loadSubs(showSubs);
-    } catch (e) {
-      alert('🤖 AI xatolik: ' + e.message);
-    }
+    } catch (e) { alert('🤖 AI xatolik: ' + e.message); }
     setAiLoading(p => ({ ...p, [s.id]: false }));
   };
 
-  const handleManualGrade = async (subId) => {
+  // Barcha javoblarni AI bilan tekshirish
+  const handleCheckAll = async (assignment) => {
+    const unchecked = subs.filter(s => !s.score || s.score === 0);
+    if (unchecked.length === 0) { alert("Barcha javoblar allaqachon tekshirilgan!"); return; }
+    if (!window.confirm(`${unchecked.length} ta javobni AI bilan tekshirish?`)) return;
+    setCheckAllLoading(p => ({ ...p, [assignment.id]: true }));
+    for (const s of unchecked) {
+      try {
+        const maxScore = assignment.max_score || 10;
+        const feedback = await geminiCheck(
+          assignment.title + (assignment.description ? ': ' + assignment.description : ''),
+          s.content, maxScore
+        );
+        const scoreMatch = feedback.match(/Baho:\s*(\d+)/);
+        const score = scoreMatch ? Math.min(parseInt(scoreMatch[1]), maxScore) : 0;
+        await API.put(`/mentor/submissions/${s.id}/grade`, { score, mentor_feedback: feedback });
+      } catch (e) { console.error('Check error:', e); }
+    }
+    setCheckAllLoading(p => ({ ...p, [assignment.id]: false }));
+    loadSubs(assignment.id);
+  };
+
+  const handleManualGrade = async (subId, maxScore) => {
     const g = manualGrade[subId] || {};
-    await API.put(`/mentor/submissions/${subId}/grade`, { score: parseInt(g.score) || 0, mentor_feedback: g.feedback || '' });
+    const score = Math.min(parseInt(g.score) || 0, maxScore || 10);
+    await API.put(`/mentor/submissions/${subId}/grade`, { score, mentor_feedback: g.feedback || '' });
     setShowManual(p => ({ ...p, [subId]: false }));
     loadSubs(showSubs);
   };
 
-  // Uy vazifasini o'chirish
+  // Bajarmagan o'quvchilarga avto-0
+  const handleAutoZero = async (assignment) => {
+    if (!window.confirm(`"${assignment.title}" vazifasini bajarmaganlar ro'yxati chiqadi va ularga 0 ball qo'yiladi. Davom etish?`)) return;
+    setAutoZeroLoading(p => ({ ...p, [assignment.id]: true }));
+    try {
+      const r = await API.post(`/mentor/assignments/${assignment.id}/auto-zero`);
+      alert(`✅ ${r.data.zero_count} ta o'quvchiga 0 ball qo'yildi`);
+      load();
+    } catch (e) { alert('❌ ' + (e.response?.data?.error || e.message)); }
+    setAutoZeroLoading(p => ({ ...p, [assignment.id]: false }));
+  };
+
   const handleDeleteHomework = async (aId) => {
     if (!window.confirm("Uy vazifasini o'chirish?")) return;
     await API.delete(`/mentor/assignments/${aId}`);
+    if (showSubs === aId) setShowSubs(null);
     load();
   };
+
+  const curAssignment = assignments.find(a => a.id === showSubs);
 
   return (
     <div className="fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ fontFamily: 'var(--font2)' }}>Uy vazifalari</h3>
+        <h3 style={{ fontFamily: 'var(--font2)' }}>📋 Uy vazifalari</h3>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Vazifa qo'shish</button>
       </div>
 
       {assignments.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>📋 Hali vazifalar yo'q</div>
+        <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>📋 Hali uy vazifalari yo'q</div>
       )}
 
       {assignments.map(a => (
@@ -286,14 +368,19 @@ function HomeworkView({ group }) {
               <h4 style={{ marginBottom: '6px' }}>{a.title}</h4>
               {a.description && <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{a.description}</p>}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <span className="tag tag-blue">📅 {a.due_date?.slice(0, 10)}</span>
-                <span className="tag tag-purple">🕐 {a.due_time}</span>
-                {!a.is_open && <span className="tag tag-red">Yopilgan</span>}
+                <span className="tag tag-blue">📅 Berilgan: {a.lesson_date?.slice(0, 10)}</span>
+                {a.due_date && <span className="tag tag-purple">⏰ Muddat: {a.due_date?.slice(0, 10)}</span>}
+                <span className="tag tag-green">🎯 Max: {a.max_score || 10} ball</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '6px', marginLeft: '12px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => showSubs === a.id ? setShowSubs(null) : loadSubs(a.id)}>
+            <div style={{ display: 'flex', gap: '6px', marginLeft: '12px', flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary btn-sm"
+                onClick={() => showSubs === a.id ? setShowSubs(null) : loadSubs(a.id)}>
                 📥 Javoblar
+              </button>
+              <button className="btn btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}
+                onClick={() => handleAutoZero(a)} disabled={autoZeroLoading[a.id]}>
+                {autoZeroLoading[a.id] ? '...' : '⛔ 0 qo'y'}
               </button>
               <button className="btn btn-danger btn-sm" onClick={() => handleDeleteHomework(a.id)}>🗑️</button>
             </div>
@@ -301,20 +388,30 @@ function HomeworkView({ group }) {
 
           {showSubs === a.id && (
             <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-              <h5 style={{ marginBottom: '12px', color: 'var(--text2)' }}>📥 Javoblar ({subs.length})</h5>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h5 style={{ color: 'var(--text2)' }}>📥 Javoblar ({subs.length})</h5>
+                {subs.length > 0 && (
+                  <button className="btn btn-sm" style={{ background: 'rgba(91,141,238,0.15)', color: 'var(--accent)', border: '1px solid rgba(91,141,238,0.3)' }}
+                    onClick={() => handleCheckAll(a)} disabled={checkAllLoading[a.id]}>
+                    {checkAllLoading[a.id] ? '⏳ Tekshirmoqda...' : `🤖 Hammasini AI tekshir (0-${a.max_score || 10})`}
+                  </button>
+                )}
+              </div>
               {subs.length === 0 && <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Hali javob yo'q</p>}
               {subs.map(s => (
                 <div key={s.id} style={{ background: 'var(--bg2)', borderRadius: '10px', padding: '14px', marginBottom: '10px', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <b>{s.full_name}</b>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      {s.score > 0 && <span className="tag tag-green">⭐ {s.score}</span>}
+                      {s.score > 0 && <span className="tag tag-green">⭐ {s.score}/{a.max_score || 10}</span>}
                       <span style={{ fontSize: '12px', color: 'var(--text3)' }}>{s.submitted_at?.slice(0, 16).replace('T', ' ')}</span>
                     </div>
                   </div>
-                  <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '10px', fontSize: '13px', fontFamily: 'monospace', marginBottom: '10px', whiteSpace: 'pre-wrap', maxHeight: '160px', overflowY: 'auto' }}>
-                    {s.content}
-                  </div>
+                  {s.content && (
+                    <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '10px', fontSize: '13px', fontFamily: 'monospace', marginBottom: '10px', whiteSpace: 'pre-wrap', maxHeight: '160px', overflowY: 'auto' }}>
+                      {s.content}
+                    </div>
+                  )}
                   {s.mentor_feedback && (
                     <div style={{ background: 'rgba(91,141,238,0.08)', border: '1px solid rgba(91,141,238,0.2)', borderRadius: '8px', padding: '10px', fontSize: '12px', marginBottom: '10px', whiteSpace: 'pre-wrap', color: 'var(--text2)' }}>
                       🤖 {s.mentor_feedback}
@@ -322,8 +419,8 @@ function HomeworkView({ group }) {
                   )}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm" style={{ background: 'rgba(91,141,238,0.15)', color: 'var(--accent)', border: '1px solid rgba(91,141,238,0.3)' }}
-                      onClick={() => handleAiCheck(s, a.title + (a.description ? ': ' + a.description : ''))} disabled={aiLoading[s.id]}>
-                      {aiLoading[s.id] ? '⏳ AI tekshirmoqda...' : '🤖 AI tekshirish'}
+                      onClick={() => handleAiCheck(s, a)} disabled={aiLoading[s.id]}>
+                      {aiLoading[s.id] ? '⏳ AI tekshirmoqda...' : `🤖 AI tekshir (0-${a.max_score || 10})`}
                     </button>
                     <button className="btn btn-sm" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--success)', border: '1px solid rgba(16,185,129,0.3)' }}
                       onClick={() => setShowManual(p => ({ ...p, [s.id]: !p[s.id] }))}>
@@ -333,8 +430,8 @@ function HomeworkView({ group }) {
                   {showManual[s.id] && (
                     <div style={{ marginTop: '10px', background: 'var(--bg3)', borderRadius: '10px', padding: '14px', border: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                        <label style={{ fontSize: '13px', color: 'var(--text2)', whiteSpace: 'nowrap' }}>Ball (0-100):</label>
-                        <input type="number" min="0" max="100" className="input" style={{ width: '90px' }}
+                        <label style={{ fontSize: '13px', color: 'var(--text2)', whiteSpace: 'nowrap' }}>Ball (0-{a.max_score || 10}):</label>
+                        <input type="number" min="0" max={a.max_score || 10} className="input" style={{ width: '90px' }}
                           value={manualGrade[s.id]?.score || ''}
                           onChange={e => setManualGrade(p => ({ ...p, [s.id]: { ...p[s.id], score: e.target.value } }))} />
                       </div>
@@ -343,7 +440,7 @@ function HomeworkView({ group }) {
                         onChange={e => setManualGrade(p => ({ ...p, [s.id]: { ...p[s.id], feedback: e.target.value } }))}
                         placeholder="Izoh yozing..." />
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn btn-primary btn-sm" onClick={() => handleManualGrade(s.id)}>💾 Saqlash</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => handleManualGrade(s.id, a.max_score)}>💾 Saqlash</button>
                         <button className="btn btn-secondary btn-sm" onClick={() => setShowManual(p => ({ ...p, [s.id]: false }))}>Bekor</button>
                       </div>
                     </div>
@@ -369,15 +466,30 @@ function HomeworkView({ group }) {
               <div className="form-group"><label>Shart / Tavsif</label>
                 <textarea className="input" rows={4} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={{ resize: 'vertical' }} />
               </div>
-              <div className="grid-2">
-                <div className="form-group"><label>Muddat sanasi</label>
-                  <input className="input" type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} required />
-                </div>
-                <div className="form-group"><label>Muddat vaqti</label>
-                  <input className="input" type="time" value={form.due_time} onChange={e => setForm({ ...form, due_time: e.target.value })} required />
-                </div>
+              <div className="form-group">
+                <label>📅 Qaysi dars sanasiga? (faqat o'tgan va bugungi sanalar)</label>
+                {validDates.length === 0 ? (
+                  <p style={{ color: 'var(--danger)', fontSize: '13px' }}>⚠️ Guruhda jadval sanasi kiritilmagan</p>
+                ) : (
+                  <select className="input" value={form.lesson_date} onChange={e => setForm({ ...form, lesson_date: e.target.value })} required>
+                    <option value="">-- Sana tanlang --</option>
+                    {validDates.map(d => (
+                      <option key={d} value={d} disabled={usedDates.has(d)}>
+                        {d} {usedDates.has(d) ? '✅ (vazifa bor)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <small style={{ color: 'var(--text3)', fontSize: '11px' }}>
+                  ⚠️ Kelajak sanaga vazifa qo'shib bo'lmaydi. Bir sanaga faqat 1 ta uy vazifasi.
+                </small>
               </div>
-              <button className="btn btn-primary" type="submit" style={{ width: '100%' }} disabled={saving}>
+              <div className="form-group">
+                <label>🎯 Maksimal ball (AI shu ballgacha tekshiradi)</label>
+                <input className="input" type="number" min="1" max="100" value={form.max_score}
+                  onChange={e => setForm({ ...form, max_score: e.target.value })} required />
+              </div>
+              <button className="btn btn-primary" type="submit" style={{ width: '100%' }} disabled={saving || validDates.length === 0}>
                 {saving ? '...' : "✅ Qo'shish"}
               </button>
             </form>
@@ -463,12 +575,14 @@ function ClassworkView({ group }) {
     setSubs(r.data);
   };
 
-  const handleAiCheck = async (s, title) => {
+  const handleAiCheck = async (s, assignment) => {
     setAiLoading(p => ({ ...p, [s.id]: true }));
     try {
-      const feedback = await geminiCheck(title, s.content);
+      const maxScore = assignment.max_score || 10;
+      const title = assignment.title + (assignment.description ? ': ' + assignment.description : '');
+      const feedback = await geminiCheck(title, s.content, maxScore);
       const scoreMatch = feedback.match(/Baho:\s*(\d+)/);
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+      const score = scoreMatch ? Math.min(parseInt(scoreMatch[1]), maxScore) : 0;
       await API.put(`/mentor/submissions/${s.id}/grade`, { score, mentor_feedback: feedback });
       loadSubs(showSubs);
     } catch (e) {
@@ -480,15 +594,16 @@ function ClassworkView({ group }) {
   // Barcha javoblarni AI bilan tekshirish
   const handleCheckAll = async (assignment) => {
     const aId = assignment.id;
+    const maxScore = assignment.max_score || 10;
     const unchecked = subs.filter(s => !s.score || s.score === 0);
     if (unchecked.length === 0) { alert("Barcha javoblar allaqachon tekshirilgan!"); return; }
-    if (!window.confirm(`${unchecked.length} ta javobni AI bilan tekshirish?`)) return;
+    if (!window.confirm(`${unchecked.length} ta javobni AI bilan tekshirish? (0-${maxScore} ball)`)) return;
     setCheckAllLoading(p => ({ ...p, [aId]: true }));
     for (const s of unchecked) {
       try {
-        const feedback = await geminiCheck(assignment.title + (assignment.description ? ': ' + assignment.description : ''), s.content);
+        const feedback = await geminiCheck(assignment.title + (assignment.description ? ': ' + assignment.description : ''), s.content, maxScore);
         const scoreMatch = feedback.match(/Baho:\s*(\d+)/);
-        const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+        const score = scoreMatch ? Math.min(parseInt(scoreMatch[1]), maxScore) : 0;
         await API.put(`/mentor/submissions/${s.id}/grade`, { score, mentor_feedback: feedback });
       } catch (e) { console.error('Check error:', e); }
     }
@@ -620,8 +735,8 @@ function ClassworkView({ group }) {
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {a.classwork_type === 'code' && (
                       <button className="btn btn-sm" style={{ background: 'rgba(91,141,238,0.15)', color: 'var(--accent)', border: '1px solid rgba(91,141,238,0.3)' }}
-                        onClick={() => handleAiCheck(s, a.title + (a.description ? ': ' + a.description : ''))} disabled={aiLoading[s.id]}>
-                        {aiLoading[s.id] ? '⏳ AI...' : '🤖 AI tekshirish'}
+                        onClick={() => handleAiCheck(s, a)} disabled={aiLoading[s.id]}>
+                        {aiLoading[s.id] ? '⏳ AI...' : `🤖 AI tekshir (0-${a.max_score || 10})`}
                       </button>
                     )}
                     <button className="btn btn-sm" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--success)', border: '1px solid rgba(16,185,129,0.3)' }}
@@ -730,7 +845,7 @@ function ClassworkView({ group }) {
 
               {cwType === 'code' && (
                 <div style={{ padding: '10px 14px', background: 'rgba(91,141,238,0.08)', borderRadius: '10px', marginBottom: '12px', fontSize: '12px', color: 'var(--text2)' }}>
-                  💡 Kodli vazifada AI avtomatik tekshiradi (0-10 ball). Siz ham qo'lda tekshirishingiz mumkin.
+                  💡 Kodli vazifada AI avtomatik tekshiradi (0 dan max ballgacha). IQ savolda to'g'ri javob berganlar avtomatik ball oladi.
                 </div>
               )}
 
