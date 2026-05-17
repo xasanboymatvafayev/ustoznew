@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import emailjs from '@emailjs/browser';
 import API from '../utils/api';
 
-// ✅ EmailJS sozlamalari — .env dan o'qiladi
-const EJS_SERVICE  = process.env.REACT_APP_EMAILJS_SERVICE;
-const EJS_TEMPLATE = process.env.REACT_APP_EMAILJS_TEMPLATE;
-const EJS_KEY      = process.env.REACT_APP_EMAILJS_KEY;
+// ✅ EmailJS sozlamalari
+const EJS_SERVICE  = 'service_8ydilud';
+const EJS_TEMPLATE = 'template_92ivt1m';
+const EJS_KEY      = 'j5RueHALLy0tonOBq';
 
 // ✅ EmailJS orqali tasdiqlash kodi yuborish
 // Template da bu o'zgaruvchilar bo'lishi kerak:
