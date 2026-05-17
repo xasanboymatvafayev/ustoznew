@@ -103,7 +103,7 @@ export default function AdminPanel() {
             {active === 'groups' && <AdminGroups groups={groups} mentors={mentors} reload={loadData} />}
             {active === 'students' && <AdminStudents students={students} reload={loadData} />}
             {active === 'calendar' && <AdminCalendar groups={groups} />}
-            {active === 'packages' && <AdminPackages data={packageData} reload={loadData} />}
+            {active === 'packages' && < data={packageData} reload={loadData} />}
           </>
         )}
       </main>
@@ -560,16 +560,17 @@ function AdminStudents({ students, reload }) {
   );
 }
 
-// ===== PAKETLAR =====
+// ===== PAKETLAR (yangilangan versiya) =====
 function AdminPackages({ data, reload }) {
   const [changing, setChanging] = useState(false);
   const [selectedKey, setSelectedKey] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [confirmKey, setConfirmKey] = useState('');
-  const [payModal, setPayModal] = useState(null); // { pay_url, package_name, amount, order_id }
-  const [payStatus, setPayStatus] = useState('pending'); // 'pending' | 'paid' | 'cancelled'
+  const [payModal, setPayModal] = useState(null);
+  const [payStatus, setPayStatus] = useState('pending');
   const pollingRef = useRef(null);
+  const paymentWindowRef = useRef(null);
 
   if (!data) return <div className="loading"><div className="spinner" /></div>;
 
@@ -595,7 +596,10 @@ function AdminPackages({ data, reload }) {
         if (status === 'paid') {
           setPayStatus('paid');
           stopPolling();
-          // 2 soniyadan so'ng modal yopiladi va sahifa yangilanadi
+          // To'lov oynasini yopish
+          if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
+            paymentWindowRef.current.close();
+          }
           setTimeout(() => {
             setPayModal(null);
             setPayStatus('pending');
@@ -629,7 +633,7 @@ function AdminPackages({ data, reload }) {
     try {
       const r = await API.post('/admin/change-package', { package_key: selectedKey });
       if (r.data.pay_url) {
-        // To'lovli paket — modal oynada to'lov sahifasini ochish
+        // To'lovli paket — yangi oynada ochish
         setPayModal({
           pay_url:      r.data.pay_url,
           package_name: r.data.package,
@@ -639,6 +643,10 @@ function AdminPackages({ data, reload }) {
         setPayStatus('pending');
         setSelectedKey('');
         setConfirmKey('');
+        
+        // Yangi oynada ochish (iframe o'rniga)
+        paymentWindowRef.current = window.open(r.data.pay_url, '_blank', 'width=800,height=600,resizable=yes,scrollbars=yes');
+        
         // Polling boshlash
         startPolling(r.data.order_id);
       } else {
@@ -656,17 +664,18 @@ function AdminPackages({ data, reload }) {
 
   const handlePayModalClose = () => {
     stopPolling();
+    if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
+      paymentWindowRef.current.close();
+    }
     setPayModal(null);
     setPayStatus('pending');
-    // X bosilganda RELOAD qilmaymiz — foydalanuvchi to'lamagan bo'lishi mumkin
-    // Lekin agar to'lov pending bo'lsa, sahifani yangilash shart emas
   };
 
   const currentPkg = packages.find(p => p.key === center.package_key);
 
   return (
     <div className="fade-in">
-      {/* To'lov modali */}
+      {/* To'lov modali (faqat status uchun, iframe yo'q) */}
       {payModal && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
@@ -675,8 +684,8 @@ function AdminPackages({ data, reload }) {
         }}>
           <div style={{
             background: 'var(--bg)', borderRadius: '16px', width: '100%',
-            maxWidth: '600px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            maxWidth: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            overflow: 'hidden',
           }}>
             {/* Modal header */}
             <div style={{
@@ -701,33 +710,60 @@ function AdminPackages({ data, reload }) {
               >✕</button>
             </div>
 
-            {/* To'lov status overlay */}
-            {payStatus === 'paid' ? (
-              <div style={{
-                height: '200px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: '12px',
-              }}>
-                <div style={{ fontSize: '48px' }}>✅</div>
-                <div style={{ fontWeight: 700, fontSize: '18px', color: '#2e7d32' }}>To'lov muvaffaqiyatli!</div>
-                <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Markaz faollashtirilmoqda...</div>
-              </div>
-            ) : payStatus === 'cancelled' ? (
-              <div style={{
-                height: '200px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: '12px',
-              }}>
-                <div style={{ fontSize: '48px' }}>❌</div>
-                <div style={{ fontWeight: 700, fontSize: '18px', color: '#c62828' }}>To'lov bekor qilindi</div>
-              </div>
-            ) : (
-              /* iframe */
-              <iframe
-                src={payModal.pay_url}
-                title="To'lov"
-                style={{ width: '100%', height: '500px', border: 'none' }}
-                allow="payment"
-              />
-            )}
+            {/* To'lov status */}
+            <div style={{ padding: '30px 20px', textAlign: 'center' }}>
+              {payStatus === 'paid' ? (
+                <>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+                  <div style={{ fontWeight: 700, fontSize: '18px', color: '#2e7d32' }}>To'lov muvaffaqiyatli!</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '8px' }}>Markaz faollashtirilmoqda...</div>
+                </>
+              ) : payStatus === 'cancelled' ? (
+                <>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>❌</div>
+                  <div style={{ fontWeight: 700, fontSize: '18px', color: '#c62828' }}>To'lov bekor qilindi</div>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ marginTop: '16px' }}
+                    onClick={handlePayModalClose}
+                  >
+                    Yopish
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔄</div>
+                  <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '8px' }}>
+                    To'lov oynasi ochildi
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '16px' }}>
+                    To'lovni yakunlang. To'lov holati avtomatik tekshiriladi.
+                  </div>
+                  <div style={{ 
+                    fontSize: '12px', 
+                    background: 'var(--bg2)', 
+                    padding: '8px', 
+                    borderRadius: '8px',
+                    color: 'var(--text2)'
+                  }}>
+                    💡 Agar to'lov oynasi ochilmagan bo'lsa, brauzeringizning pop-up blokirovkasini tekshiring
+                  </div>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ marginTop: '16px' }}
+                    onClick={() => {
+                      if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
+                        paymentWindowRef.current.focus();
+                      } else {
+                        paymentWindowRef.current = window.open(payModal.pay_url, '_blank', 'width=800,height=600,resizable=yes,scrollbars=yes');
+                      }
+                    }}
+                  >
+                    🪟 To'lov oynasini qayta ochish
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Footer hint */}
             <div style={{
@@ -739,13 +775,14 @@ function AdminPackages({ data, reload }) {
               {payStatus === 'paid'
                 ? '✅ To\'lov qabul qilindi! Sahifa yangilanmoqda...'
                 : payStatus === 'cancelled'
-                ? '❌ To\'lov bekor qilindi. Oynani yopishingiz mumkin.'
-                : '🔄 To\'lov holati har 10 soniyada tekshiriladi. To\'lovni amalga oshirgach markaz avtomatik faollashadi.'}
+                ? '❌ To\'lov bekor qilindi'
+                : '🔄 To\'lov holati har 10 soniyada tekshiriladi'}
             </div>
           </div>
         </div>
       )}
 
+      {/* Qolgan qismi o'zgarishsiz */}
       <div className="page-header">
         <h2>📦 Paketlar</h2>
         <p>Joriy obuna holati va paketni o'zgartirish</p>
@@ -882,7 +919,7 @@ function AdminPackages({ data, reload }) {
             Tasdiqlash uchun yangi paket nomini kiriting:{' '}
             <b style={{ color: 'var(--accent)' }}>{packages.find(p => p.key === selectedKey)?.name}</b>
           </p>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               className="input"
               style={{ flex: 1, maxWidth: '280px' }}
@@ -903,7 +940,7 @@ function AdminPackages({ data, reload }) {
           </div>
           {packages.find(p => p.key === selectedKey)?.price > 0 && (
             <p style={{ marginTop: '12px', fontSize: '12px', color: 'var(--text3)' }}>
-              ⚠️ To'lovli paketga o'tgandan so'ng to'lov bo'limi orqali to'lash kerak bo'ladi.
+              ⚠️ To'lovli paketga o'tgandan so'ng to'lov oynasi ochiladi.
             </p>
           )}
         </div>
