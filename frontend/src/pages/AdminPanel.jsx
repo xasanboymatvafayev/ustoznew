@@ -751,7 +751,7 @@ function AdminPackages({ data, reload }) {
                   <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '16px' }}>
                     To'lovni yakunlang. To'lov holati avtomatik tekshiriladi.
                   </div>
-                  {/* LINK QO'SHISH */}
+                  
                   <div style={{ marginTop: '16px', padding: '12px', background: '#e3f2fd', borderRadius: '8px' }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: '13px' }}>
                       🔗 Agar oyna ochilmasa, quyidagi linkni bosing:
